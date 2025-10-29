@@ -1,3 +1,10 @@
+# New performance case for GIST 100K (L2)
+
+# ...existing code...
+
+# Place this class after PerformanceCase is defined
+
+# ...existing code...
 import logging
 from enum import Enum, auto
 
@@ -116,6 +123,15 @@ class PerformanceCase(Case, BaseModel):
     filter_rate: float | None = None
     load_timeout: float | int = config.LOAD_TIMEOUT_DEFAULT
     optimize_timeout: float | int | None = config.OPTIMIZE_TIMEOUT_DEFAULT
+
+# New performance case for GIST 100K (L2)
+class PerformanceGIST100K(PerformanceCase):
+    case_id: CaseType = CaseType.PerformanceCustomDataset  # Or add a new enum if needed
+    dataset: DatasetManager = Dataset.GIST.manager(100_000)
+    name: str = "Search Performance Test (GIST 100K, 960 Dim, L2)"
+    description: str = """This case tests the search performance of a vector database with the GIST dataset (100K vectors, 960 dimensions, L2 metric)."""
+    load_timeout: float | int = 600
+    optimize_timeout: float | int | None = 600
 
 
 # New case for Cohere 100K, L2 metric
@@ -376,5 +392,5 @@ type2case = {
     CaseType.Performance1536D500K99P: Performance1536D500K99P,
     CaseType.Performance1536D5M99P: Performance1536D5M99P,
     CaseType.Performance1536D50K: Performance1536D50K,
-    CaseType.PerformanceCustomDataset: Performance768D100KL2,
+    CaseType.PerformanceCustomDataset: PerformanceGIST100K,
 }

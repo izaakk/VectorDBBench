@@ -205,8 +205,6 @@ class CommonTypedDict(TypedDict):
         click.option(
             "--svs-method",
             type=click.Choice(["flat", "vamana"]),
-            default="flat",
-            show_default=True,
             help="SVS method: flat or vamana (for OpenSearch SVS index types)",
         ),
     ]

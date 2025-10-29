@@ -60,7 +60,7 @@ class AWSOpenSearch(VectorDB):
                 "knn.memory.circuit_breaker.limit": self.case_config.cb_threshold,
             }
         }
-    client.cluster.put_settings(body=cluster_settings_body)
+        client.cluster.put_settings(body=cluster_settings_body)
         settings = {
             "index": {
                 "knn": True,

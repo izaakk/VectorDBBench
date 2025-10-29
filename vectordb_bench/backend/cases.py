@@ -57,9 +57,9 @@ class CaseType(Enum):
     def case_cls(self, custom_configs: dict | None = None) -> type["Case"]:
         if custom_configs is None:
             return type2case.get(self)()
+        return type2case.get(self)(**custom_configs)
 
     PerformanceGIST100K = 102
-        return type2case.get(self)(**custom_configs)
 
     def case_name(self, custom_configs: dict | None = None) -> str:
         c = self.case_cls(custom_configs)

@@ -1,8 +1,3 @@
-"""
-Usage:
-    >>> from xxx.dataset import Dataset
-    >>> Dataset.Cohere.get(100_000)
-"""
 
 import logging
 import pathlib
@@ -93,6 +88,7 @@ class LAION(BaseDataset):
     }
 
 
+
 class GIST(BaseDataset):
     name: str = "GIST"
     dim: int = 960
@@ -101,6 +97,19 @@ class GIST(BaseDataset):
     _size_label: dict = {
         100_000: SizeLabel(100_000, "SMALL", 1),
         1_000_000: SizeLabel(1_000_000, "MEDIUM", 1),
+    }
+
+# Standard Cohere dataset (COSINE metric, required for Dataset enum compatibility)
+class Cohere(BaseDataset):
+    name: str = "Cohere"
+    dim: int = 768
+    metric_type: MetricType = MetricType.COSINE
+    use_shuffled: bool = config.USE_SHUFFLED_DATA
+    with_gt: bool = (True,)
+    _size_label: dict = {
+        100_000: SizeLabel(100_000, "SMALL", 1),
+        1_000_000: SizeLabel(1_000_000, "MEDIUM", 1),
+        10_000_000: SizeLabel(10_000_000, "LARGE", 10),
     }
 
 

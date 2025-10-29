@@ -39,18 +39,35 @@ class AWSOS_Engine(Enum):
     lucene = "lucene"
 
 
+
+# SVS encoder types
+class AWSOSEncoder(Enum):
+    none = "none"         # No encoder (flat or vamana)
+    fp16 = "svs_fp16"
+    sq8 = "svs_sq8"
+    lvq = "lvq"           # Note: LVQ encoder name is 'lvq', not 'svs_lvq'
+
 class AWSOSQuantization(Enum):
     fp32 = "fp32"
     fp16 = "fp16"
 
 
+
 class AWSOpenSearchIndexConfig(BaseModel, DBCaseConfig):
-    degree: int = 64  # Only used for SVS Vamana
+    # General
     metric_type: MetricType = MetricType.L2
     engine: AWSOS_Engine = AWSOS_Engine.faiss
+    # SVS
+    svs_method: str = "flat"  # flat, vamana
+    svs_encoder: AWSOSEncoder = AWSOSEncoder.none  # none, fp16, sq8, lvq
+    degree: int = 64  # Only used for Vamana
+    primary_bits: int = 4  # For LVQ
+    residual_bits: int = 8  # For LVQ
+    # HNSW
     efConstruction: int = 256
     efSearch: int = 256
     M: int = 16
+    # Other
     index_thread_qty: int | None = 4
     number_of_shards: int | None = 1
     number_of_replicas: int | None = 0
@@ -58,7 +75,7 @@ class AWSOpenSearchIndexConfig(BaseModel, DBCaseConfig):
     refresh_interval: str | None = "60s"
     force_merge_enabled: bool | None = True
     flush_threshold_size: str | None = "5120mb"
-    index_thread_qty_during_force_merge: int
+    index_thread_qty_during_force_merge: int = 4
     cb_threshold: str | None = "50%"
     quantization_type: AWSOSQuantization = AWSOSQuantization.fp32
 
@@ -70,16 +87,33 @@ class AWSOpenSearchIndexConfig(BaseModel, DBCaseConfig):
         return "l2"
 
     def index_param(self) -> dict:
-        # SVS Vamana + fp16 encoder (no ef_construction/ef_runtime, use degree)
-        if self.engine == AWSOS_Engine.faiss and self.quantization_type == AWSOSQuantization.fp16:
+        # SVS Flat
+        if self.svs_method == "flat":
+            return {
+                "name": "svs_flat",
+                "space_type": self.parse_metric(),
+                "engine": self.engine.value,
+            }
+        # SVS Vamana (with or without encoder)
+        if self.svs_method == "vamana":
+            params = {"degree": self.degree}
+            if self.svs_encoder == AWSOSEncoder.fp16:
+                params["encoder"] = {"name": "svs_fp16"}
+            elif self.svs_encoder == AWSOSEncoder.sq8:
+                params["encoder"] = {"name": "svs_sq8"}
+            elif self.svs_encoder == AWSOSEncoder.lvq:
+                params["encoder"] = {
+                    "name": "lvq",
+                    "parameters": {
+                        "primary_bits": self.primary_bits,
+                        "residual_bits": self.residual_bits,
+                    },
+                }
             return {
                 "name": "svs_vamana",
                 "space_type": self.parse_metric(),
                 "engine": self.engine.value,
-                "parameters": {
-                    "degree": self.degree,
-                    "encoder": {"name": "svs_fp16"}
-                },
+                "parameters": params,
             }
         # Default: HNSW (with or without quantization)
         params = {

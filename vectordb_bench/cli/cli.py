@@ -190,6 +190,46 @@ log = logging.getLogger(__name__)
 
 
 class CommonTypedDict(TypedDict):
+    svs_method: Annotated[
+        str,
+        click.option(
+            "--svs-method",
+            type=click.Choice(["flat", "vamana"]),
+            default="flat",
+            show_default=True,
+            help="SVS method: flat or vamana (for OpenSearch SVS index types)",
+        ),
+    ]
+    svs_encoder: Annotated[
+        str,
+        click.option(
+            "--svs-encoder",
+            type=click.Choice(["none", "svs_fp16", "svs_sq8", "lvq"]),
+            default="none",
+            show_default=True,
+            help="SVS encoder: none, svs_fp16, svs_sq8, or lvq (for OpenSearch SVS index types)",
+        ),
+    ]
+    primary_bits: Annotated[
+        int,
+        click.option(
+            "--primary-bits",
+            type=int,
+            default=4,
+            show_default=True,
+            help="Primary bits for LVQ encoder (only used if --svs-encoder=lvq)",
+        ),
+    ]
+    residual_bits: Annotated[
+        int,
+        click.option(
+            "--residual-bits",
+            type=int,
+            default=8,
+            show_default=True,
+            help="Residual bits for LVQ encoder (only used if --svs-encoder=lvq)",
+        ),
+    ]
     config_file: Annotated[
         bool,
         click.option(

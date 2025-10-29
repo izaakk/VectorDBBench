@@ -119,7 +119,7 @@ class AWSOpenSearch(VectorDB):
         try:
             resp = self.client.bulk(body=insert_data)
             log.info(f"AWS_OpenSearch adding documents: {len(resp['items'])}")
-            resp = self.client.indices.stats(self.index_name)
+            resp = self.client.indices.stats(index=self.index_name)
             log.info(
                 f"Total document count in index: {resp['_all']['primaries']['indexing']['index_total']}",
             )

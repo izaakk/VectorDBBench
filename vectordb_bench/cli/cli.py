@@ -190,6 +190,16 @@ log = logging.getLogger(__name__)
 
 
 class CommonTypedDict(TypedDict):
+    index_name: Annotated[
+        str,
+        click.option(
+            "--index-name",
+            type=str,
+            default="vdb_bench_index",
+            show_default=True,
+            help="Custom index name for OpenSearch index (default: vdb_bench_index)",
+        ),
+    ]
     svs_method: Annotated[
         str,
         click.option(

@@ -124,6 +124,11 @@ class AWSOpenSearchHNSWTypedDict(CommonTypedDict, AWSOpenSearchTypedDict, HNSWFl
 def AWSOpenSearch(**parameters: Unpack[AWSOpenSearchHNSWTypedDict]):
     from .config import AWSOpenSearchConfig, AWSOpenSearchIndexConfig
 
+    # Always use L2 for SVS indices
+    metric_type = "L2"
+    if parameters.get("svs_method", "flat") not in ("flat", "vamana"):
+        metric_type = parameters.get("metric_type", "L2")
+
     run(
         db=DB.AWSOpenSearch,
         db_config=AWSOpenSearchConfig(
@@ -147,6 +152,12 @@ def AWSOpenSearch(**parameters: Unpack[AWSOpenSearchHNSWTypedDict]):
             M=parameters["m"],
             engine=AWSOS_Engine(parameters["engine"]),
             quantization_type=AWSOSQuantization(parameters["quantization_type"]),
+            svs_method=parameters.get("svs_method", "flat"),
+            svs_encoder=parameters.get("svs_encoder", "none"),
+            primary_bits=parameters.get("primary_bits", 4),
+            residual_bits=parameters.get("residual_bits", 8),
+            degree=parameters.get("degree", 64),
+            metric_type=metric_type,
         ),
         **parameters,
     )

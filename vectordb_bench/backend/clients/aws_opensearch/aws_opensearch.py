@@ -148,15 +148,23 @@ class AWSOpenSearch(VectorDB):
         """
         assert self.client is not None, "should self.init() first"
 
+        # Only include HNSW method_parameters if using HNSW; exclude for SVS (vamana/flat)
+        knn_query = {
+            "vector": query,
+            "k": k,
+        }
+        if getattr(self.case_config, "svs_method", None) is None:
+            # Assume HNSW if svs_method is not set
+            knn_query["method_parameters"] = {"ef_search": self.case_config.efSearch}
+        elif self.case_config.svs_method not in ["vamana", "flat"]:
+            # If not SVS, include method_parameters
+            knn_query["method_parameters"] = {"ef_search": self.case_config.efSearch}
+        # Otherwise, do not include method_parameters for SVS
         body = {
             "size": k,
             "query": {
                 "knn": {
-                    self.vector_col_name: {
-                        "vector": query,
-                        "k": k,
-                        "method_parameters": {"ef_search": self.case_config.efSearch},
-                    }
+                    self.vector_col_name: knn_query
                 }
             },
             **({"filter": {"range": {self.id_col_name: {"gt": filters["id"]}}}} if filters else {}),

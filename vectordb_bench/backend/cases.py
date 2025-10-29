@@ -1,10 +1,3 @@
-class Performance768D100KL2(PerformanceCase):
-    case_id: CaseType = CaseType.PerformanceCustomDataset  # Use custom or add new if needed
-    dataset: DatasetManager = DatasetManager(data=dataset.CohereL2(size=100_000))
-    name: str = "Search Performance Test (100K Cohere, 768 Dim, L2)"
-    description: str = """This case tests the search performance of a vector database with a small Cohere dataset (100K vectors, 768 dimensions, L2 metric)."""
-    load_timeout: float | int = 600
-    optimize_timeout: float | int | None = 600
 import logging
 from enum import Enum, auto
 

@@ -117,7 +117,7 @@ class AWSOpenSearch(VectorDB):
             )
             insert_data.append({self.vector_col_name: embeddings[i]})
         try:
-            resp = self.client.bulk(insert_data)
+            resp = self.client.bulk(body=insert_data)
             log.info(f"AWS_OpenSearch adding documents: {len(resp['items'])}")
             resp = self.client.indices.stats(self.index_name)
             log.info(

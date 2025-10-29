@@ -1,5 +1,6 @@
 import logging
 from enum import Enum
+from typing import Optional
 
 from pydantic import BaseModel, SecretStr
 
@@ -11,13 +12,15 @@ log = logging.getLogger(__name__)
 class AWSOpenSearchConfig(DBConfig, BaseModel):
     host: str = ""
     port: int = 80
-    user: str = ""
-    password: SecretStr = ""
+    user: Optional[str] = None
+    password: Optional[SecretStr] = None
 
     def to_dict(self) -> dict:
-        use_ssl = self.port == 443
+        use_ssl = self.port == 443 and self.host != "localhost"
         http_auth = (
-            (self.user, self.password.get_secret_value()) if len(self.user) != 0 and len(self.password) != 0 else ()
+            (self.user, self.password.get_secret_value())
+            if self.user and self.password
+            else ()
         )
         return {
             "hosts": [{"host": self.host, "port": self.port}],

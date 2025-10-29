@@ -57,6 +57,8 @@ class CaseType(Enum):
     def case_cls(self, custom_configs: dict | None = None) -> type["Case"]:
         if custom_configs is None:
             return type2case.get(self)()
+
+    PerformanceGIST100K = 102
         return type2case.get(self)(**custom_configs)
 
     def case_name(self, custom_configs: dict | None = None) -> str:
@@ -392,5 +394,6 @@ type2case = {
     CaseType.Performance1536D500K99P: Performance1536D500K99P,
     CaseType.Performance1536D5M99P: Performance1536D5M99P,
     CaseType.Performance1536D50K: Performance1536D50K,
-    CaseType.PerformanceCustomDataset: PerformanceGIST100K,
+    CaseType.PerformanceCustomDataset: PerformanceCustomDataset,
+    CaseType.PerformanceGIST100K: PerformanceGIST100K,
 }

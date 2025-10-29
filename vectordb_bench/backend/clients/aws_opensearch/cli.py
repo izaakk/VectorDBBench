@@ -15,6 +15,16 @@ from .config import AWSOS_Engine, AWSOSQuantization
 
 
 class AWSOpenSearchTypedDict(TypedDict):
+    degree: Annotated[
+        int,
+        click.option(
+            "--degree",
+            type=int,
+            help="Graph degree for SVS Vamana (ignored for HNSW)",
+            default=64,
+            required=False,
+        ),
+    ]
     host: Annotated[str, click.option("--host", type=str, help="Db host", required=True)]
     port: Annotated[int, click.option("--port", type=int, default=80, help="Db Port")]
     user: Annotated[str, click.option("--user", type=str, help="Db User")]

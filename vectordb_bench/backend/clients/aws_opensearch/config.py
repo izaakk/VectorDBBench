@@ -45,6 +45,7 @@ class AWSOSQuantization(Enum):
 
 
 class AWSOpenSearchIndexConfig(BaseModel, DBCaseConfig):
+    degree: int = 64  # Only used for SVS Vamana
     metric_type: MetricType = MetricType.L2
     engine: AWSOS_Engine = AWSOS_Engine.faiss
     efConstruction: int = 256
@@ -69,20 +70,30 @@ class AWSOpenSearchIndexConfig(BaseModel, DBCaseConfig):
         return "l2"
 
     def index_param(self) -> dict:
+        # SVS Vamana + fp16 encoder (no ef_construction/ef_runtime, use degree)
+        if self.engine == AWSOS_Engine.faiss and self.quantization_type == AWSOSQuantization.fp16:
+            return {
+                "name": "svs_vamana",
+                "space_type": self.parse_metric(),
+                "engine": self.engine.value,
+                "parameters": {
+                    "degree": self.degree,
+                    "encoder": {"name": "svs_fp16"}
+                },
+            }
+        # Default: HNSW (with or without quantization)
+        params = {
+            "ef_construction": self.efConstruction,
+            "m": self.M,
+            "ef_search": self.efSearch,
+        }
+        if self.quantization_type is not AWSOSQuantization.fp32:
+            params["encoder"] = {"name": "sq", "parameters": {"type": self.quantization_type.fp16.value}}
         return {
             "name": "hnsw",
             "space_type": self.parse_metric(),
             "engine": self.engine.value,
-            "parameters": {
-                "ef_construction": self.efConstruction,
-                "m": self.M,
-                "ef_search": self.efSearch,
-                **(
-                    {"encoder": {"name": "sq", "parameters": {"type": self.quantization_type.fp16.value}}}
-                    if self.quantization_type is not AWSOSQuantization.fp32
-                    else {}
-                ),
-            },
+            "parameters": params,
         }
 
     def search_param(self) -> dict:

@@ -30,7 +30,8 @@ class AWSOpenSearch(VectorDB):
         self.dim = dim
         self.db_config = db_config
         self.case_config = db_case_config
-        self.index_name = index_name
+        # Allow index_name to be overridden by kwargs (e.g. from CLI)
+        self.index_name = kwargs.get("index_name", index_name)
         self.id_col_name = id_col_name
         self.category_col_names = [f"scalar-{categoryCount}" for categoryCount in [2, 5, 10, 100, 1000]]
         self.vector_col_name = vector_col_name

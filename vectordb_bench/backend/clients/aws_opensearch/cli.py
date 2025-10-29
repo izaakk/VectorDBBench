@@ -120,7 +120,7 @@ def AWSOpenSearch(**parameters: Unpack[AWSOpenSearchHNSWTypedDict]):
             host=parameters["host"],
             port=parameters["port"],
             user=parameters["user"],
-            password=SecretStr(parameters["password"]),
+            password=SecretStr(parameters["password"]) if parameters["password"] else None,
         ),
         db_case_config=AWSOpenSearchIndexConfig(
             number_of_shards=parameters["number_of_shards"],

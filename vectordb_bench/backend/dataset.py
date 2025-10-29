@@ -104,10 +104,12 @@ class GIST(BaseDataset):
     }
 
 
-class Cohere(BaseDataset):
-    name: str = "Cohere"
+
+# Custom Cohere dataset with L2 metric for SVS testing
+class CohereL2(BaseDataset):
+    name: str = "CohereL2"
     dim: int = 768
-    metric_type: MetricType = MetricType.COSINE
+    metric_type: MetricType = MetricType.L2
     use_shuffled: bool = config.USE_SHUFFLED_DATA
     with_gt: bool = (True,)
     _size_label: dict = {
@@ -308,6 +310,7 @@ class Dataset(Enum):
     LAION = LAION
     GIST = GIST
     COHERE = Cohere
+    COHERE_L2 = CohereL2
     GLOVE = Glove
     SIFT = SIFT
     OPENAI = OpenAI

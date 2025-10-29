@@ -1,3 +1,10 @@
+class Performance768D100KL2(PerformanceCase):
+    case_id: CaseType = CaseType.PerformanceCustomDataset  # Use custom or add new if needed
+    dataset: DatasetManager = DatasetManager(data=dataset.CohereL2(size=100_000))
+    name: str = "Search Performance Test (100K Cohere, 768 Dim, L2)"
+    description: str = """This case tests the search performance of a vector database with a small Cohere dataset (100K vectors, 768 dimensions, L2 metric)."""
+    load_timeout: float | int = 600
+    optimize_timeout: float | int | None = 600
 import logging
 from enum import Enum, auto
 
@@ -116,6 +123,16 @@ class PerformanceCase(Case, BaseModel):
     filter_rate: float | None = None
     load_timeout: float | int = config.LOAD_TIMEOUT_DEFAULT
     optimize_timeout: float | int | None = config.OPTIMIZE_TIMEOUT_DEFAULT
+
+
+# New case for Cohere 100K, L2 metric
+class Performance768D100KL2(PerformanceCase):
+    case_id: CaseType = CaseType.PerformanceCustomDataset  # Use custom or add new if needed
+    dataset: DatasetManager = Dataset.COHERE_L2.manager(100_000)
+    name: str = "Search Performance Test (100K Cohere, 768 Dim, L2)"
+    description: str = """This case tests the search performance of a vector database with a small Cohere dataset (100K vectors, 768 dimensions, L2 metric)."""
+    load_timeout: float | int = 600
+    optimize_timeout: float | int | None = 600
 
 
 class CapacityDim960(CapacityCase):
@@ -366,5 +383,5 @@ type2case = {
     CaseType.Performance1536D500K99P: Performance1536D500K99P,
     CaseType.Performance1536D5M99P: Performance1536D5M99P,
     CaseType.Performance1536D50K: Performance1536D50K,
-    CaseType.PerformanceCustomDataset: PerformanceCustomDataset,
+    CaseType.PerformanceCustomDataset: Performance768D100KL2,
 }

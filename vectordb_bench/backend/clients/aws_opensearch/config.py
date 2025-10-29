@@ -58,7 +58,7 @@ class AWSOpenSearchIndexConfig(BaseModel, DBCaseConfig):
     metric_type: MetricType = MetricType.L2
     engine: AWSOS_Engine = AWSOS_Engine.faiss
     # SVS
-    svs_method: str = "flat"  # flat, vamana
+    svs_method: str | None = None  # flat, vamana
     svs_encoder: AWSOSEncoder = AWSOSEncoder.none  # none, fp16, sq8, lvq
     degree: int = 64  # Only used for Vamana
     primary_bits: int = 4  # For LVQ
@@ -87,14 +87,13 @@ class AWSOpenSearchIndexConfig(BaseModel, DBCaseConfig):
         return "l2"
 
     def index_param(self) -> dict:
-        # SVS Flat
+        # Only use SVS if explicitly requested
         if self.svs_method == "flat":
             return {
                 "name": "svs_flat",
                 "space_type": self.parse_metric(),
                 "engine": self.engine.value,
             }
-        # SVS Vamana (with or without encoder)
         if self.svs_method == "vamana":
             params = {"degree": self.degree}
             if self.svs_encoder == AWSOSEncoder.fp16:

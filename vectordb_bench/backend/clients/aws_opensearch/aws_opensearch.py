@@ -21,7 +21,7 @@ class AWSOpenSearch(VectorDB):
         dim: int,
         db_config: dict,
         db_case_config: AWSOpenSearchIndexConfig,
-        index_name: str = "vdb_bench_index",  # must be lowercase
+        index_name: str = "vdb_svs_fp16",  # must be lowercase
         id_col_name: str = "_id",
         vector_col_name: str = "embedding",
         drop_old: bool = False,
@@ -67,7 +67,6 @@ class AWSOpenSearch(VectorDB):
                 "knn": True,
                 "number_of_shards": self.case_config.number_of_shards,
                 "number_of_replicas": 0,
-                # Setting trans log threshold to 5GB
                 "translog.flush_threshold_size": self.case_config.flush_threshold_size,
                 "knn.advanced.approximate_threshold": "-1",
             },
@@ -97,7 +96,6 @@ class AWSOpenSearch(VectorDB):
     def init(self) -> None:
         """connect to opensearch"""
         self.client = OpenSearch(**self.db_config)
-
         yield
         self.client = None
         del self.client
@@ -136,37 +134,31 @@ class AWSOpenSearch(VectorDB):
         k: int = 100,
         filters: dict | None = None,
     ) -> list[int]:
-        """Get k most similar embeddings to query vector.
-
-        Args:
-            query(list[float]): query embedding to look up documents similar to.
-            k(int): Number of most similar embeddings to return. Defaults to 100.
-            filters(dict, optional): filtering expression to filter the data while searching.
-
-        Returns:
-            list[tuple[int, float]]: list of k most similar embeddings in (id, score) tuple to the query embedding.
-        """
+        """Get k most similar embeddings to query vector."""
         assert self.client is not None, "should self.init() first"
 
-        # Only include HNSW method_parameters if using HNSW; exclude for SVS (vamana/flat)
+        # Build KNN query
         knn_query = {
             "vector": query,
             "k": k,
         }
-        if getattr(self.case_config, "svs_method", None) is None:
-            # Assume HNSW if svs_method is not set
+
+        # Handle method-specific runtime parameters safely
+        svs_method = getattr(self.case_config, "svs_method", None)
+        if svs_method is None:
+            # Only apply ef_search for Lucene/HNSW, not for FAISS SVS
+            if self.case_config.engine == AWSOS_Engine.lucene:
+                knn_query["method_parameters"] = {"ef_search": self.case_config.efSearch}
+            else:
+                log.debug("Skipping ef_search for FAISS engine with no explicit method (likely SVS)")
+        elif svs_method.lower() in ["svs_vamana", "vamana", "svs_flat", "flat"]:
+            log.debug(f"Skipping ef_search for SVS method={svs_method}")
+        else:
             knn_query["method_parameters"] = {"ef_search": self.case_config.efSearch}
-        elif self.case_config.svs_method not in ["vamana", "flat"]:
-            # If not SVS, include method_parameters
-            knn_query["method_parameters"] = {"ef_search": self.case_config.efSearch}
-        # Otherwise, do not include method_parameters for SVS
+
         body = {
             "size": k,
-            "query": {
-                "knn": {
-                    self.vector_col_name: knn_query
-                }
-            },
+            "query": {"knn": {self.vector_col_name: knn_query}},
             **({"filter": {"range": {self.id_col_name: {"gt": filters["id"]}}}} if filters else {}),
         }
 
@@ -189,24 +181,21 @@ class AWSOpenSearch(VectorDB):
             raise e from None
 
     def optimize(self, data_size: int | None = None):
-        """optimize will be called between insertion and search in performance cases."""
-        # Call refresh first to ensure that all segments are created
+        """Optimize index between insertion and search."""
         self._refresh_index()
         if self.case_config.force_merge_enabled:
             self._do_force_merge()
             self._refresh_index()
         self._update_replicas()
-        # Call refresh again to ensure that the index is ready after force merge.
         self._refresh_index()
-        # ensure that all graphs are loaded in memory and ready for search
         self._load_graphs_to_memory()
 
     def _update_replicas(self):
         index_settings = self.client.indices.get_settings(index=self.index_name)
         current_number_of_replicas = int(index_settings[self.index_name]["settings"]["index"]["number_of_replicas"])
         log.info(
-            f"Current Number of replicas are {current_number_of_replicas}"
-            f" and changing the replicas to {self.case_config.number_of_replicas}"
+            f"Current Number of replicas are {current_number_of_replicas} "
+            f"and changing to {self.case_config.number_of_replicas}"
         )
         settings_body = {"index": {"number_of_replicas": self.case_config.number_of_replicas}}
         self.client.indices.put_settings(index=self.index_name, body=settings_body)
@@ -219,9 +208,9 @@ class AWSOpenSearch(VectorDB):
             health = res[0]["health"]
             if health == "green":
                 break
-            log.info(f"The index {self.index_name} has health : {health} and is not green. Retrying")
+            log.info(f"Index {self.index_name} has health: {health}. Retrying...")
             time.sleep(SECONDS_WAITING_FOR_REPLICAS_TO_BE_ENABLED_SEC)
-        log.info(f"Index {self.index_name} is green..")
+        log.info(f"Index {self.index_name} is green.")
 
     def _refresh_index(self):
         log.debug(f"Starting refresh for index {self.index_name}")
@@ -231,26 +220,23 @@ class AWSOpenSearch(VectorDB):
                 self.client.indices.refresh(index=self.index_name)
                 break
             except Exception as e:
-                log.info(
-                    f"Refresh errored out. Sleeping for {WAITING_FOR_REFRESH_SEC} sec and then Retrying : {e}",
-                )
+                log.info(f"Refresh errored. Sleeping for {WAITING_FOR_REFRESH_SEC}s then retrying: {e}")
                 time.sleep(WAITING_FOR_REFRESH_SEC)
                 continue
         log.debug(f"Completed refresh for index {self.index_name}")
 
     def _do_force_merge(self):
-        log.info(f"Updating the Index thread qty to {self.case_config.index_thread_qty_during_force_merge}.")
-
+        log.info(f"Updating index thread qty to {self.case_config.index_thread_qty_during_force_merge}.")
         cluster_settings_body = {
             "persistent": {"knn.algo_param.index_thread_qty": self.case_config.index_thread_qty_during_force_merge}
         }
         self.client.cluster.put_settings(body=cluster_settings_body)
 
-        log.info("Updating the graph threshold to ensure that during merge we can do graph creation.")
+        log.info("Updating graph threshold to allow merge-time graph creation.")
         output = self.client.indices.put_settings(
             index=self.index_name, body={"index.knn.advanced.approximate_threshold": "0"}
         )
-        log.info(f"response of updating setting is: {output}")
+        log.info(f"Response of updating setting: {output}")
 
         log.debug(f"Starting force merge for index {self.index_name}")
         segments = self.case_config.number_of_segments

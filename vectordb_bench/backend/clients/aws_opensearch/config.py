@@ -39,7 +39,6 @@ class AWSOS_Engine(Enum):
     lucene = "lucene"
 
 
-
 # SVS encoder types
 class AWSOSEncoder(Enum):
     none = "none"         # No encoder (flat or vamana)
@@ -47,10 +46,10 @@ class AWSOSEncoder(Enum):
     sq8 = "svs_sq8"
     lvq = "lvq"           # Note: LVQ encoder name is 'lvq', not 'svs_lvq'
 
+
 class AWSOSQuantization(Enum):
     fp32 = "fp32"
     fp16 = "fp16"
-
 
 
 class AWSOpenSearchIndexConfig(BaseModel, DBCaseConfig):
@@ -63,10 +62,10 @@ class AWSOpenSearchIndexConfig(BaseModel, DBCaseConfig):
     degree: int = 64  # Only used for Vamana
     primary_bits: int = 4  # For LVQ
     residual_bits: int = 8  # For LVQ
-    # HNSW
-    efConstruction: int = 256
-    efSearch: int = 256
-    M: int = 16
+    # HNSW (optional for SVS)
+    efConstruction: int | None = 256
+    efSearch: int | None = 256
+    M: int | None = 16
     # Other
     index_thread_qty: int | None = 4
     number_of_shards: int | None = 1
@@ -116,9 +115,9 @@ class AWSOpenSearchIndexConfig(BaseModel, DBCaseConfig):
             }
         # Default: HNSW (with or without quantization)
         params = {
-            "ef_construction": self.efConstruction,
-            "m": self.M,
-            "ef_search": self.efSearch,
+            "ef_construction": self.efConstruction or 256,
+            "m": self.M or 16,
+            "ef_search": self.efSearch or 256,
         }
         if self.quantization_type is not AWSOSQuantization.fp32:
             params["encoder"] = {"name": "sq", "parameters": {"type": self.quantization_type.fp16.value}}

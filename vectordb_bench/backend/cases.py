@@ -60,6 +60,7 @@ class CaseType(Enum):
         return type2case.get(self)(**custom_configs)
 
     PerformanceGIST100K = 102
+    Performance768D1ML2 = 103  # CohereL2 dataset with L2 metric
 
     def case_name(self, custom_configs: dict | None = None) -> str:
         c = self.case_cls(custom_configs)
@@ -181,6 +182,17 @@ class Performance768D1M(PerformanceCase):
     name: str = "Search Performance Test (1M Dataset, 768 Dim)"
     description: str = """This case tests the search performance of a vector database with a medium dataset
     (<b>Cohere 1M vectors</b>, 768 dimensions) at varying parallel levels.
+    Results will show index building time, recall, and maximum QPS."""
+    load_timeout: float | int = config.LOAD_TIMEOUT_768D_1M
+    optimize_timeout: float | int | None = config.OPTIMIZE_TIMEOUT_768D_1M
+
+
+class Performance768D1ML2(PerformanceCase):
+    case_id: CaseType = CaseType.Performance768D1ML2
+    dataset: DatasetManager = Dataset.COHERE_L2.manager(1_000_000)
+    name: str = "Search Performance Test (1M Dataset, 768 Dim, L2 Metric)"
+    description: str = """This case tests the search performance of a vector database with a medium dataset
+    (<b>Cohere 1M vectors</b>, 768 dimensions, L2 distance metric) at varying parallel levels.
     Results will show index building time, recall, and maximum QPS."""
     load_timeout: float | int = config.LOAD_TIMEOUT_768D_1M
     optimize_timeout: float | int | None = config.OPTIMIZE_TIMEOUT_768D_1M
@@ -396,4 +408,5 @@ type2case = {
     CaseType.Performance1536D50K: Performance1536D50K,
     CaseType.PerformanceCustomDataset: PerformanceCustomDataset,
     CaseType.PerformanceGIST100K: PerformanceGIST100K,
+    CaseType.Performance768D1ML2: Performance768D1ML2,
 }

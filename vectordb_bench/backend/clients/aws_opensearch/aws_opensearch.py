@@ -23,7 +23,7 @@ class AWSOpenSearch(VectorDB):
         db_case_config: AWSOpenSearchIndexConfig,
         index_name: str = "vdb_svs_fp16",  # must be lowercase
         id_col_name: str = "_id",
-        vector_col_name: str = "embedding",
+        vector_col_name: str = "target_field",
         drop_old: bool = False,
         **kwargs,
     ):
@@ -167,15 +167,12 @@ class AWSOpenSearch(VectorDB):
                 index=self.index_name,
                 body=body,
                 size=k,
-                _source=False,
-                docvalue_fields=[self.id_col_name],
-                stored_fields="_none_",
-                preference="_only_local" if self.case_config.number_of_shards == 1 else None,
+                _source=[self.id_col_name],
             )
             log.debug(f"Search took: {resp['took']}")
             log.debug(f"Search shards: {resp['_shards']}")
             log.debug(f"Search hits total: {resp['hits']['total']}")
-            return [int(h["fields"][self.id_col_name][0]) for h in resp["hits"]["hits"]]
+            return [int(h["_id"]) for h in resp["hits"]["hits"]]
         except Exception as e:
             log.warning(f"Failed to search: {self.index_name} error: {e!s}")
             raise e from None

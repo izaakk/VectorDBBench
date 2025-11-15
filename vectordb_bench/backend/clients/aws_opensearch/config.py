@@ -56,6 +56,7 @@ class AWSOpenSearchIndexConfig(BaseModel, DBCaseConfig):
     # General
     metric_type: MetricType = MetricType.L2
     engine: AWSOS_Engine = AWSOS_Engine.faiss
+    index_name: str | None = None  # Custom index name (defaults to vdb_svs_fp16 in client)
     # SVS
     svs_method: str | None = None  # flat, vamana
     svs_encoder: AWSOSEncoder = AWSOSEncoder.none  # none, fp16, sq8, lvq

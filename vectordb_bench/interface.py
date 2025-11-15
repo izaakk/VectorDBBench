@@ -54,6 +54,10 @@ class BenchMarkRunner:
         else:
             self.dataset_source = DatasetSource.S3
 
+    def set_dataset_source(self, source: DatasetSource):
+        """Set the dataset source directly"""
+        self.dataset_source = source
+
     def run(self, tasks: list[TaskConfig], task_label: str | None = None) -> bool:
         """run all the tasks in the configs, write one result into the path"""
         self.latest_error = ""

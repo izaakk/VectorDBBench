@@ -18,6 +18,7 @@ DatasetReader = typing.TypeVar("DatasetReader")
 class DatasetSource(Enum):
     S3 = "S3"
     AliyunOSS = "AliyunOSS"
+    Local = "Local"
 
     def reader(self) -> DatasetReader:
         if self == DatasetSource.S3:
@@ -25,6 +26,9 @@ class DatasetSource(Enum):
 
         if self == DatasetSource.AliyunOSS:
             return AliyunOSSReader()
+
+        if self == DatasetSource.Local:
+            return LocalReader()
 
         return None
 
@@ -155,3 +159,32 @@ class AwsS3Reader(DatasetReader):
             return False
 
         return True
+
+
+class LocalReader(DatasetReader):
+    """Local dataset reader that uses files already present on disk"""
+    source: DatasetSource = DatasetSource.Local
+    remote_root: str = ""
+
+    def read(self, dataset: str, files: list[str], local_ds_root: pathlib.Path):
+        """For local files, we just check if they exist. No downloading needed."""
+        if not local_ds_root.exists():
+            raise FileNotFoundError(f"Local dataset directory does not exist: {local_ds_root}")
+        
+        missing_files = []
+        for file in files:
+            local_file = local_ds_root.joinpath(file)
+            if not local_file.exists():
+                missing_files.append(file)
+        
+        if missing_files:
+            raise FileNotFoundError(
+                f"Missing local files in {local_ds_root}: {missing_files}"
+            )
+        
+        log.info(f"All {len(files)} dataset files found locally in {local_ds_root}")
+
+    def validate_file(self, remote: pathlib.Path, local: pathlib.Path) -> bool:
+        """For local files, just check existence"""
+        return local.exists()
+

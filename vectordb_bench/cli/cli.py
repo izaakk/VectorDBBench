@@ -269,6 +269,16 @@ class CommonTypedDict(TypedDict):
             show_default=True,
         ),
     ]
+    data_source: Annotated[
+        str,
+        click.option(
+            "--data-source",
+            type=click.Choice(["S3", "AliyunOSS", "Local"]),
+            default="S3",
+            help="Dataset source: S3, AliyunOSS, or Local (for pre-existing local files)",
+            show_default=True,
+        ),
+    ]
     search_serial: Annotated[
         bool,
         click.option(
@@ -563,6 +573,9 @@ def run(
 
     log.info(f"Task:\n{pformat(task)}\n")
     if not parameters["dry_run"]:
+        # Set dataset source before running
+        from vectordb_bench.backend.data_source import DatasetSource
+        benchmark_runner.set_dataset_source(DatasetSource[parameters["data_source"]])
         benchmark_runner.run([task], task_label)
         time.sleep(5)
         if global_result_future:

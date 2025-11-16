@@ -31,7 +31,7 @@ class AWSOpenSearch(VectorDB):
         self.db_config = db_config
         self.case_config = db_case_config
         # HARDCODED for testing
-        self.index_name = "target_index_hnsw"
+        self.index_name = "target_index_hnsw_fp16"
         self.id_col_name = id_col_name
         self.category_col_names = [f"scalar-{categoryCount}" for categoryCount in [2, 5, 10, 100, 1000]]
         self.vector_col_name = vector_col_name

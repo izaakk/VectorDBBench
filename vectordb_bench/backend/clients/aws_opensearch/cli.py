@@ -138,6 +138,7 @@ def AWSOpenSearch(**parameters: Unpack[AWSOpenSearchHNSWTypedDict]):
             password=SecretStr(parameters["password"]) if parameters["password"] else None,
         ),
         db_case_config=AWSOpenSearchIndexConfig(
+            index_name=parameters.get("index_name"),
             number_of_shards=parameters["number_of_shards"],
             number_of_replicas=parameters["number_of_replicas"],
             index_thread_qty=parameters["index_thread_qty"],

@@ -239,13 +239,13 @@ class CommonTypedDict(TypedDict):
         ),
     ]
     search_window_size: Annotated[
-        int,
+        int | None,
         click.option(
             "--search-window-size",
             type=int,
             default=None,
             show_default=True,
-            help="Search window size for SVS Vamana (search-time parameter, only used with --svs-method=vamana)",
+            help="Search window size for SVS Vamana (search-time parameter, auto-detected from index)",
         ),
     ]
     config_file: Annotated[

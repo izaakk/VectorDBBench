@@ -30,8 +30,8 @@ class AWSOpenSearch(VectorDB):
         self.dim = dim
         self.db_config = db_config
         self.case_config = db_case_config
-        # HARDCODED for testing - change this to match your index name
-        self.index_name = "cohere-1m-lvq4x4"
+        # Use index_name from config if provided, else use constructor param
+        self.index_name = db_case_config.index_name if db_case_config.index_name else index_name
         self.id_col_name = id_col_name
         self.category_col_names = [f"scalar-{categoryCount}" for categoryCount in [2, 5, 10, 100, 1000]]
         self.vector_col_name = vector_col_name
@@ -39,6 +39,7 @@ class AWSOpenSearch(VectorDB):
 
         log.info(f"AWS_OpenSearch client config: {self.db_config}")
         log.info(f"AWS_OpenSearch db case config : {self.case_config}")
+        log.info(f"AWS_OpenSearch index_name: {self.index_name}")
         client = OpenSearch(**self.db_config)
         if drop_old:
             log.info(f"AWS_OpenSearch client drop old index: {self.index_name}")

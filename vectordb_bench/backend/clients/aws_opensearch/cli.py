@@ -157,6 +157,7 @@ def AWSOpenSearch(**parameters: Unpack[AWSOpenSearchHNSWTypedDict]):
             primary_bits=parameters.get("primary_bits", 4),
             residual_bits=parameters.get("residual_bits", 8),
             degree=parameters.get("degree", 64),
+            search_window_size=parameters.get("search_window_size"),
             metric_type=metric_type,
         ),
         **parameters,

@@ -35,6 +35,7 @@ class AWSOpenSearch(VectorDB):
         self.id_col_name = id_col_name
         self.category_col_names = [f"scalar-{categoryCount}" for categoryCount in [2, 5, 10, 100, 1000]]
         self.vector_col_name = vector_col_name
+        self._detected_method = None  # Cache for auto-detected index method
 
         log.info(f"AWS_OpenSearch client config: {self.db_config}")
         log.info(f"AWS_OpenSearch db case config : {self.case_config}")
@@ -96,9 +97,39 @@ class AWSOpenSearch(VectorDB):
     def init(self) -> None:
         """connect to opensearch"""
         self.client = OpenSearch(**self.db_config)
+        # Auto-detect index method on connection
+        self._detect_index_method()
         yield
         self.client = None
         del self.client
+
+    def _detect_index_method(self) -> str | None:
+        """Auto-detect the k-NN method from the index mapping.
+        
+        Returns:
+            The method name (e.g., 'hnsw', 'svs_vamana', 'svs_flat') or None if detection fails.
+        """
+        if self._detected_method is not None:
+            return self._detected_method
+            
+        try:
+            mapping = self.client.indices.get_mapping(index=self.index_name)
+            # Navigate to the vector field's method
+            properties = mapping[self.index_name]["mappings"]["properties"]
+            vector_field = properties.get(self.vector_col_name, {})
+            method = vector_field.get("method", {})
+            method_name = method.get("name")
+            
+            if method_name:
+                self._detected_method = method_name.lower()
+                log.info(f"Auto-detected index method: {self._detected_method} for index {self.index_name}")
+            else:
+                log.warning(f"Could not detect method from mapping for index {self.index_name}")
+                
+            return self._detected_method
+        except Exception as e:
+            log.warning(f"Failed to auto-detect index method: {e}")
+            return None
 
     def insert_embeddings(
         self,
@@ -143,18 +174,32 @@ class AWSOpenSearch(VectorDB):
             "k": k,
         }
 
-        # Handle method-specific runtime parameters safely
-        svs_method = getattr(self.case_config, "svs_method", None)
-        if svs_method is None:
-            # Only apply ef_search for Lucene/HNSW, not for FAISS SVS
-            if self.case_config.engine == AWSOS_Engine.lucene:
-                knn_query["method_parameters"] = {"ef_search": self.case_config.efSearch}
+        # Auto-detect index method and apply appropriate search parameters
+        detected_method = self._detected_method or self._detect_index_method()
+        
+        if detected_method in ["svs_vamana"]:
+            # SVS Vamana uses search_window_size
+            search_window = getattr(self.case_config, "search_window_size", None)
+            if search_window is not None:
+                knn_query["method_parameters"] = {"search_window_size": search_window}
+                log.debug(f"Using search_window_size={search_window} for SVS Vamana")
             else:
-                log.debug("Skipping ef_search for FAISS engine with no explicit method (likely SVS)")
-        elif svs_method.lower() in ["svs_vamana", "vamana", "svs_flat", "flat"]:
-            log.debug(f"Skipping ef_search for SVS method={svs_method}")
+                log.debug("No search_window_size specified for SVS Vamana, using index default")
+        elif detected_method in ["svs_flat"]:
+            # SVS Flat has no search-time parameters
+            log.debug("SVS Flat detected, no search-time parameters needed")
+        elif detected_method in ["hnsw"]:
+            # HNSW uses ef_search
+            ef_search = getattr(self.case_config, "efSearch", None)
+            if ef_search is not None:
+                knn_query["method_parameters"] = {"ef_search": ef_search}
+                log.debug(f"Using ef_search={ef_search} for HNSW")
         else:
-            knn_query["method_parameters"] = {"ef_search": self.case_config.efSearch}
+            # Fallback: try ef_search for unknown methods (likely HNSW variants)
+            log.debug(f"Unknown method '{detected_method}', attempting ef_search fallback")
+            ef_search = getattr(self.case_config, "efSearch", None)
+            if ef_search is not None and self.case_config.engine == AWSOS_Engine.lucene:
+                knn_query["method_parameters"] = {"ef_search": ef_search}
 
         body = {
             "size": k,

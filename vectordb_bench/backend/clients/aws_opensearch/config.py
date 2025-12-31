@@ -63,6 +63,7 @@ class AWSOpenSearchIndexConfig(BaseModel, DBCaseConfig):
     degree: int = 64  # Only used for Vamana
     primary_bits: int = 4  # For LVQ
     residual_bits: int = 8  # For LVQ
+    search_window_size: int | None = None  # Search-time param for SVS Vamana
     # HNSW (optional for SVS)
     efConstruction: int | None = 256
     efSearch: int | None = 256

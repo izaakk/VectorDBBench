@@ -238,6 +238,16 @@ class CommonTypedDict(TypedDict):
             help="Residual bits for LVQ encoder (only used if --svs-encoder=lvq)",
         ),
     ]
+    search_window_size: Annotated[
+        int,
+        click.option(
+            "--search-window-size",
+            type=int,
+            default=None,
+            show_default=True,
+            help="Search window size for SVS Vamana (search-time parameter, only used with --svs-method=vamana)",
+        ),
+    ]
     config_file: Annotated[
         bool,
         click.option(

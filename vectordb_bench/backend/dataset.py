@@ -128,6 +128,20 @@ class CohereL2(BaseDataset):
     }
 
 
+# Custom Cohere dataset with Inner Product metric for SVS testing
+class CohereIP(BaseDataset):
+    name: str = "CohereIP"
+    dim: int = 768
+    metric_type: MetricType = MetricType.IP
+    use_shuffled: bool = config.USE_SHUFFLED_DATA
+    with_gt: bool = (True,)
+    _size_label: dict = {
+        100_000: SizeLabel(100_000, "SMALL", 1),
+        1_000_000: SizeLabel(1_000_000, "MEDIUM", 1),
+        10_000_000: SizeLabel(10_000_000, "LARGE", 10),
+    }
+
+
 class Glove(BaseDataset):
     name: str = "Glove"
     dim: int = 200
@@ -320,6 +334,7 @@ class Dataset(Enum):
     GIST = GIST
     COHERE = Cohere
     COHERE_L2 = CohereL2
+    COHERE_IP = CohereIP
     GLOVE = Glove
     SIFT = SIFT
     OPENAI = OpenAI

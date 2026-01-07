@@ -134,7 +134,8 @@ class AWSOpenSearch(VectorDB):
                 # Query the model API to get the method
                 try:
                     model_info = self.client.transport.perform_request("GET", f"/_plugins/_knn/models/{model_id}")
-                    model_method = model_info.get("method_component_context", {}).get("name")
+                    # Model info returns method name in model_definition.name
+                    model_method = model_info.get("model_definition", {}).get("name")
                     if model_method:
                         self._detected_method = model_method.lower()
                         log.info(f"Auto-detected index method from model {model_id}: {self._detected_method}")

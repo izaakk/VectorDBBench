@@ -118,15 +118,31 @@ class AWSOpenSearch(VectorDB):
             # Navigate to the vector field's method
             properties = mapping[self.index_name]["mappings"]["properties"]
             vector_field = properties.get(self.vector_col_name, {})
+            
+            # Check for direct method definition (HNSW, LVQ, etc.)
             method = vector_field.get("method", {})
             method_name = method.get("name")
             
             if method_name:
                 self._detected_method = method_name.lower()
                 log.info(f"Auto-detected index method: {self._detected_method} for index {self.index_name}")
-            else:
-                log.warning(f"Could not detect method from mapping for index {self.index_name}")
-                
+                return self._detected_method
+            
+            # Check for model_id (used by trained indexes like LeanVec)
+            model_id = vector_field.get("model_id")
+            if model_id:
+                # Query the model API to get the method
+                try:
+                    model_info = self.client.transport.perform_request("GET", f"/_plugins/_knn/models/{model_id}")
+                    model_method = model_info.get("method_component_context", {}).get("name")
+                    if model_method:
+                        self._detected_method = model_method.lower()
+                        log.info(f"Auto-detected index method from model {model_id}: {self._detected_method}")
+                        return self._detected_method
+                except Exception as model_err:
+                    log.warning(f"Failed to query model {model_id}: {model_err}")
+            
+            log.warning(f"Could not detect method from mapping for index {self.index_name}")
             return self._detected_method
         except Exception as e:
             log.warning(f"Failed to auto-detect index method: {e}")
@@ -179,13 +195,19 @@ class AWSOpenSearch(VectorDB):
         detected_method = self._detected_method or self._detect_index_method()
         
         if detected_method in ["svs_vamana"]:
-            # SVS Vamana uses search_window_size
+            # SVS Vamana uses search_window_size and search_buffer_capacity
             search_window = getattr(self.case_config, "search_window_size", None)
+            search_buffer = getattr(self.case_config, "search_buffer_capacity", None)
+            method_params = {}
             if search_window is not None:
-                knn_query["method_parameters"] = {"search_window_size": search_window}
-                log.debug(f"Using search_window_size={search_window} for SVS Vamana")
+                method_params["search_window_size"] = search_window
+            if search_buffer is not None:
+                method_params["search_buffer_capacity"] = search_buffer
+            if method_params:
+                knn_query["method_parameters"] = method_params
+                log.debug(f"Using SVS Vamana search params: {method_params}")
             else:
-                log.debug("No search_window_size specified for SVS Vamana, using index default")
+                log.debug("No search params specified for SVS Vamana, using index defaults")
         elif detected_method in ["svs_flat"]:
             # SVS Flat has no search-time parameters
             log.debug("SVS Flat detected, no search-time parameters needed")

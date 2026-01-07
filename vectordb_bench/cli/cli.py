@@ -248,6 +248,16 @@ class CommonTypedDict(TypedDict):
             help="Search window size for SVS Vamana (search-time parameter, auto-detected from index)",
         ),
     ]
+    search_buffer_capacity: Annotated[
+        int | None,
+        click.option(
+            "--search-buffer-capacity",
+            type=int,
+            default=None,
+            show_default=True,
+            help="Search buffer capacity for SVS Vamana (search-time parameter)",
+        ),
+    ]
     config_file: Annotated[
         bool,
         click.option(

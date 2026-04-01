@@ -493,6 +493,36 @@ class CommonTypedDict(TypedDict):
             show_default=True,
         ),
     ]
+    calibrate: Annotated[
+        float | None,
+        click.option(
+            "--calibrate",
+            type=float,
+            default=None,
+            help="Target recall for calibration. "
+            "Calibrated parameters are used in both serial and concurrent "
+            "search, but calibration is only executed with serial search.",
+        ),
+    ]
+    calibration_param: Annotated[
+        str | None,
+        click.option(
+            "--calibration-param",
+            type=str,
+            default=None,
+            help="Name of the parameter to calibrate (e.g., 'ef_search', 'search_window_size')",
+        ),
+    ]
+    calibration_limit: Annotated[
+        int,
+        click.option(
+            "--calibration-limit",
+            type=int,
+            default=1000,
+            show_default=True,
+            help="Maximum number of calibration iterations",
+        ),
+    ]
     task_label: Annotated[str, click.option("--task-label", help="Task label")]
 
 

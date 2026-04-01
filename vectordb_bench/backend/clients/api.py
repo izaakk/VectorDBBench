@@ -34,6 +34,7 @@ class IndexType(str, Enum):
     GPU_IVF_PQ = "GPU_IVF_PQ"
     GPU_CAGRA = "GPU_CAGRA"
     SCANN = "scann"
+    SVS_VAMANA = "SVS-VAMANA"
     NONE = "NONE"
 
 

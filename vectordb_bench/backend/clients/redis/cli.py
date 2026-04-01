@@ -11,13 +11,31 @@ from ....cli.cli import (
     run,
 )
 from .. import DB
-from .config import RedisHNSWConfig
+from .config import RedisHNSWConfig, RedisSVSVAMANAConfig, SVS_VAMANA_COMPRESSION_OPTIONS
 
 
 class RedisTypedDict(TypedDict):
     host: Annotated[str, click.option("--host", type=str, help="Db host", required=True)]
     password: Annotated[str, click.option("--password", type=str, help="Db password")]
     port: Annotated[int, click.option("--port", type=int, default=6379, help="Db Port")]
+    use_float16: Annotated[
+        bool,
+        click.option(
+            "--use-float16/--no-use-float16",
+            is_flag=True,
+            default=False,
+            help="Store and query vectors as FLOAT16 instead of FLOAT32",
+        ),
+    ]
+    filtering_batch_size: Annotated[
+        int | None,
+        click.option(
+            "--filtering-batch-size",
+            type=int,
+            default=None,
+            help="Batch size for hybrid filtering policy (HYBRID_POLICY BATCHES)",
+        ),
+    ]
     ssl: Annotated[
         bool,
         click.option(
@@ -46,9 +64,56 @@ class RedisTypedDict(TypedDict):
             help="Cluster Mode Disabled (CMD) for Redis doesn't use Cluster conn",
         ),
     ]
+    hybrid_policy: Annotated[
+        str,
+        click.option(
+            "--hybrid-policy",
+            type=click.Choice(["ADHOC_BF", "BATCHES"]),
+            help="Policy for filtered (or hybrid) search.",
+        ),
+    ]
 
 
 class RedisHNSWTypedDict(CommonTypedDict, RedisTypedDict, HNSWFlavor2): ...
+
+
+class RedisSVSVAMANATypedDict(CommonTypedDict, RedisTypedDict):
+    graph_max_degree: Annotated[
+        int,
+        click.option(
+            "--graph-max-degree",
+            type=int,
+            required=True,
+            help="SVS-VAMANA GRAPH_MAX_DEGREE (equivalent to HNSW M)",
+        ),
+    ]
+    construction_window_size: Annotated[
+        int,
+        click.option(
+            "--construction-window-size",
+            type=int,
+            required=True,
+            help="SVS-VAMANA CONSTRUCTION_WINDOW_SIZE (equivalent to HNSW EF_CONSTRUCTION)",
+        ),
+    ]
+    search_window_size: Annotated[
+        int | None,
+        click.option(
+            "--search-window-size",
+            type=int,
+            default=None,
+            help="SVS-VAMANA SEARCH_WINDOW_SIZE (equivalent to HNSW EF_RUNTIME)",
+        ),
+    ]
+    compression: Annotated[
+        str | None,
+        click.option(
+            "--compression",
+            type=click.Choice(SVS_VAMANA_COMPRESSION_OPTIONS, case_sensitive=True),
+            default=None,
+            help="SVS-VAMANA compression type (official SVS types: NONE, FP16, LVQ4, LVQ8, LVQ4X4, LVQ4X8)",
+        ),
+    ]
 
 
 @cli.command()
@@ -71,6 +136,55 @@ def Redis(**parameters: Unpack[RedisHNSWTypedDict]):
             M=parameters["m"],
             efConstruction=parameters["ef_construction"],
             ef=parameters["ef_runtime"],
+            filtering_batch_size=parameters["filtering_batch_size"],
+            calibration_target=parameters["calibrate"],
+            calibration_param=parameters["calibration_param"] or "ef",
+            calibration_limit=parameters["calibration_limit"],
+            use_float16=parameters["use_float16"],
+            hybrid_policy=parameters["hybrid_policy"],
+        ),
+        **parameters,
+    )
+
+
+@cli.command()
+@click_parameter_decorators_from_typed_dict(RedisSVSVAMANATypedDict)
+def RedisSVSVAMANA(**parameters: Unpack[RedisSVSVAMANATypedDict]):
+    """
+    VectorDBBench command for Redis SVS-VAMANA index.
+
+    Supports official SVS compression types from protobuf schema:
+    - NONE: No compression
+    - FP16: 16-bit floating point
+    - LVQ4: 4-bit learned vector quantization
+    - LVQ8: 8-bit learned vector quantization
+    - LVQ4X4: 4-bit + 4-bit LVQ
+    - LVQ4X8: 4-bit + 8-bit LVQ (recommended for balanced performance)
+    """
+    from .config import RedisConfig, RedisSVSVAMANAConfig
+
+    run(
+        db=DB.Redis,
+        db_config=RedisConfig(
+            db_label=parameters["db_label"],
+            password=SecretStr(parameters["password"]) if parameters["password"] else None,
+            host=SecretStr(parameters["host"]),
+            port=parameters["port"],
+            ssl=parameters["ssl"],
+            ssl_ca_certs=parameters["ssl_ca_certs"],
+            cmd=parameters["cmd"],
+        ),
+        db_case_config=RedisSVSVAMANAConfig(
+            graph_max_degree=parameters["graph_max_degree"],
+            construction_window_size=parameters["construction_window_size"],
+            search_window_size=parameters["search_window_size"],
+            compression=parameters["compression"],
+            filtering_batch_size=parameters["filtering_batch_size"],
+            calibration_target=parameters["calibrate"],
+            calibration_param=parameters["calibration_param"] or "search_window_size",
+            calibration_limit=parameters["calibration_limit"],
+            use_float16=parameters["use_float16"],
+            hybrid_policy=parameters["hybrid_policy"],
         ),
         **parameters,
     )

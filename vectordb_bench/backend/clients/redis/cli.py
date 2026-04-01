@@ -69,6 +69,8 @@ class RedisTypedDict(TypedDict):
         click.option(
             "--hybrid-policy",
             type=click.Choice(["ADHOC_BF", "BATCHES"]),
+            default="BATCHES",
+            show_default=True,
             help="Policy for filtered (or hybrid) search.",
         ),
     ]

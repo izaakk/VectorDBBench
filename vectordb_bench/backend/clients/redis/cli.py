@@ -42,7 +42,7 @@ class RedisTypedDict(TypedDict):
             "--ssl/--no-ssl",
             is_flag=True,
             show_default=True,
-            default=True,
+            default=False,  # Fixed: default to False for compatibility with non-SSL Valkey/Redis
             help="Enable or disable SSL for Redis",
         ),
     ]

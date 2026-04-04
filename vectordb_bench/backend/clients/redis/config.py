@@ -13,7 +13,7 @@ class RedisConfig(DBConfig):
     password: SecretStr | None = None
     host: SecretStr
     port: int | None = None
-    ssl: bool = True
+    ssl: bool = False  # Fixed: default to False for compatibility with non-SSL Valkey/Redis
     ssl_ca_certs: str | None = None
     cmd: bool = False
 

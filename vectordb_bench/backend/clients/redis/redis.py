@@ -91,11 +91,8 @@ class Redis(VectorDB):
             index_params = self.case_config.index_param()
             index_type = index_params["index_type"]
 
-            # Fix 3a: SVS index type normalization for redis-py compatibility
-            # redis-py VectorField expects "SVS" not "SVS-VAMANA"
-            if index_type.startswith("SVS-"):
-                log.info(f"Normalizing index type '{index_type}' → 'SVS' for redis-py")
-                index_type = "SVS"
+            # redis-py is patched to accept "SVS-VAMANA" - pass through original value
+            # Valkey expects the full "SVS-VAMANA" string in FT.CREATE command
 
             vector_field_attrs = {
                 "TYPE": self._redis_type,  # FLOAT16, FLOAT32 or FLOAT64

@@ -101,9 +101,18 @@ class Redis(VectorDB):
                 **index_params["params"],
             }
 
+            # Create VectorField with original index_type for redis-py validation
+            vector_field = VectorField(self._vector_field, index_type, vector_field_attrs)
+
+            # Normalize for Valkey server compatibility
+            # redis-py validates 'SVS-VAMANA' but Valkey expects just 'SVS'
+            if index_type == "SVS-VAMANA":
+                log.info(f"Normalizing algorithm for Valkey: '{index_type}' → 'SVS'")
+                vector_field.args[1] = "SVS"  # args = [VECTOR, algorithm, count, ...]
+
             schema = [
                 NumericField(self._numeric_field),
-                VectorField(self._vector_field, index_type, vector_field_attrs),
+                vector_field,
             ]
             if self.with_scalar_labels:
                 schema.append(TagField(self._label_field))

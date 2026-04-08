@@ -69,11 +69,18 @@ class ReadWriteRunner(MultiProcessingSearchRunner, RatedMultiThreadingInsertRunn
             dataset_iter=iter(dataset),
             normalize=normalize,
         )
+        # Convert ground truth to list format if it's a DataFrame
+        gt_data = dataset.gt_data
+        if gt_data is not None and hasattr(gt_data, 'values'):
+            gt_data = gt_data.values.tolist()
+
         self.serial_search_runner = SerialSearchRunner(
             db=db,
             test_data=test_emb,
-            ground_truth=dataset.gt_data,
+            ground_truth=gt_data,
+            db_case_config=None,  # ReadWriteRunner doesn't use calibration
             k=k,
+            filters=filters,
         )
 
     def run_optimize(self):
@@ -86,16 +93,16 @@ class ReadWriteRunner(MultiProcessingSearchRunner, RatedMultiThreadingInsertRunn
     def run_search(self):
         log.info("Search after write - Serial search start")
         res, ssearch_dur = self.serial_search_runner.run()
-        recall, ndcg, p99_latency = res
+        recall, ndcg, p99_latency, p95_latency, config_overwrite = res
         log.info(
-            f"Search after write - Serial search - recall={recall}, ndcg={ndcg}, p99={p99_latency}, "
+            f"Search after write - Serial search - recall={recall}, ndcg={ndcg}, p99={p99_latency}, p95={p95_latency}, "
             f"dur={ssearch_dur:.4f}",
         )
         log.info(f"Search after wirte - Conc search start, dur for each conc={self.read_dur_after_write}")
         max_qps = self.run_by_dur(self.read_dur_after_write)
         log.info(f"Search after wirte - Conc search finished, max_qps={max_qps}")
 
-        return (max_qps, recall, ndcg, p99_latency)
+        return (max_qps, recall, ndcg, p99_latency, p95_latency)
 
     def run_read_write(self):
         with mp.Manager() as m:
@@ -161,10 +168,10 @@ class ReadWriteRunner(MultiProcessingSearchRunner, RatedMultiThreadingInsertRunn
             log.info(f"Insert {perc}% done, total batch={total_batch}")
             log.info(f"[{target_batch}/{total_batch}] Serial search - {perc}% start")
             res, ssearch_dur = self.serial_search_runner.run()
-            recall, ndcg, p99_latency = res
+            recall, ndcg, p99_latency, p95_latency, config_overwrite = res
             log.info(
                 f"[{target_batch}/{total_batch}] Serial search - {perc}% done, recall={recall}, "
-                f"ndcg={ndcg}, p99={p99_latency}, dur={ssearch_dur:.4f}"
+                f"ndcg={ndcg}, p99={p99_latency}, p95={p95_latency}, dur={ssearch_dur:.4f}"
             )
 
             # Search duration for non-last search stage is carefully calculated.
@@ -192,7 +199,7 @@ class ReadWriteRunner(MultiProcessingSearchRunner, RatedMultiThreadingInsertRunn
                 f"[{target_batch}/{total_batch}] Concurrent search - {perc}% start, dur={each_conc_search_dur:.4f}"
             )
             max_qps = self.run_by_dur(each_conc_search_dur)
-            result.append((perc, max_qps, recall, ndcg, p99_latency))
+            result.append((perc, max_qps, recall, ndcg, p99_latency, p95_latency))
 
             start_batch = target_batch
 

@@ -261,12 +261,20 @@ class CaseRunner(BaseModel):
         gt_df = self.ca.dataset.gt_data
 
         if TaskStage.SEARCH_SERIAL in self.config.stages:
+            # Convert ground truth DataFrame to list[list[int]] format
+            if gt_df is not None and hasattr(gt_df, 'values'):
+                # gt_df is a pandas DataFrame, convert to list of lists
+                ground_truth_list = gt_df.values.tolist() if hasattr(gt_df, 'values') else gt_df.tolist()
+            else:
+                ground_truth_list = gt_df
+
             self.serial_search_runner = SerialSearchRunner(
                 db=self.db,
                 test_data=self.test_emb,
-                ground_truth=gt_df,
-                filters=self.ca.filters,
+                ground_truth=ground_truth_list,
+                db_case_config=self.config.db_case_config,
                 k=self.config.case_config.k,
+                filters=self.ca.filters,
             )
         if TaskStage.SEARCH_CONCURRENT in self.config.stages:
             self.search_runner = MultiProcessingSearchRunner(

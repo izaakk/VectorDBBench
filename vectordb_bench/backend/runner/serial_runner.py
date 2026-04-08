@@ -10,6 +10,7 @@ import pandas as pd
 import psutil
 
 from vectordb_bench.backend.dataset import DatasetManager
+from vectordb_bench.backend.filter import Filter, FilterOp, non_filter
 
 from ... import config
 from ...metric import calc_ndcg, calc_recall, get_ideal_dcg
@@ -30,12 +31,14 @@ class SerialInsertRunner:
         db: api.VectorDB,
         dataset: DatasetManager,
         normalize: bool,
+        filters: Filter = non_filter,
         timeout: float | None = None,
     ):
         self.timeout = timeout if isinstance(timeout, int | float) else None
         self.dataset = dataset
         self.db = db
         self.normalize = normalize
+        self.filters = filters
 
     def task(self) -> int:
         count = 0
@@ -43,9 +46,9 @@ class SerialInsertRunner:
             log.info(f"({mp.current_process().name:16}) Start inserting embeddings in batch {config.NUM_PER_BATCH}")
             start = time.perf_counter()
             for data_df in self.dataset:
-                all_metadata = data_df["id"].tolist()
+                all_metadata = data_df[self.dataset.data.train_id_field].tolist()
 
-                emb_np = np.stack(data_df["emb"])
+                emb_np = np.stack(data_df[self.dataset.data.train_vector_field])
                 if self.normalize:
                     log.debug("normalize the 100k train data")
                     all_embeddings = (emb_np / np.linalg.norm(emb_np, axis=1)[:, np.newaxis]).tolist()
@@ -54,9 +57,17 @@ class SerialInsertRunner:
                 del emb_np
                 log.debug(f"batch dataset size: {len(all_embeddings)}, {len(all_metadata)}")
 
+                labels_data = None
+                if self.filters.type == FilterOp.StrEqual:
+                    if self.dataset.data.scalar_labels_file_separated:
+                        labels_data = self.dataset.scalar_labels[self.filters.label_field][all_metadata].to_list()
+                    else:
+                        labels_data = data_df[self.filters.label_field].tolist()
+
                 insert_count, error = self.db.insert_embeddings(
                     embeddings=all_embeddings,
                     metadata=all_metadata,
+                    labels_data=labels_data,
                 )
                 if error is not None:
                     raise error
@@ -188,13 +199,15 @@ class SerialSearchRunner:
         self,
         db: api.VectorDB,
         test_data: list[list[float]],
-        ground_truth: pd.DataFrame,
+        ground_truth: list[list[int]],
+        db_case_config: api.DBCaseConfig | None = None,
         k: int = 100,
-        filters: dict | None = None,
+        filters: Filter = non_filter,
     ):
         self.db = db
         self.k = k
         self.filters = filters
+        self.db_case_config = db_case_config
 
         if isinstance(test_data[0], np.ndarray):
             self.test_data = [query.tolist() for query in test_data]
@@ -202,35 +215,109 @@ class SerialSearchRunner:
             self.test_data = test_data
         self.ground_truth = ground_truth
 
-    def search(self, args: tuple[list, pd.DataFrame]) -> tuple[float, float, float]:
+    def _get_db_search_res(self, emb: list[float], retry_idx: int = 0, config_overwrite: dict[str, int] | None = None) -> list[int]:
+        try:
+            results = self.db.search_embedding(emb, self.k, config_overwrite=config_overwrite)
+        except Exception as e:
+            log.warning(f"Serial search failed, retry_idx={retry_idx}, Exception: {e}")
+            if retry_idx < config.MAX_SEARCH_RETRY:
+                return self._get_db_search_res(emb=emb, retry_idx=retry_idx + 1, config_overwrite=config_overwrite)
+
+            msg = f"Serial search failed and retried more than {config.MAX_SEARCH_RETRY} times"
+            raise RuntimeError(msg) from e
+
+        return results
+
+    def _calibrate(
+        self,
+        test_data: list,
+        ground_truth: list[list[int]],
+        calibration_param: str,
+        min_value: int,
+        recall: float,
+        max_value: int = 1000,
+    ) -> tuple[int, float]:
+        """Calibrate search for a given recall target."""
+        if min_value > max_value:
+            raise ValueError(
+                f"{min_value=} cannot be greater than {max_value=}"
+            )
+        lower_bound = min_value
+        upper_bound = max_value
+        lower_bound_visited = False
+        upper_bound_visited = False
+        current = (lower_bound + upper_bound) // 2
+        previous = current
+        current_recall = 0
+        while True:
+            previous_recall = current_recall
+            config_overwrite = {calibration_param: current}
+            recalls = []
+            for idx, emb in enumerate(test_data):
+                s = time.perf_counter()
+                results = self._get_db_search_res(emb, config_overwrite=config_overwrite)
+                recalls.append(calc_recall(self.k, ground_truth[idx][: self.k], results))
+            current_recall = np.mean(recalls)
+            if np.isclose(current_recall, recall):
+                return current, current_recall
+            if current_recall > recall:
+                upper_bound = current
+                upper_bound_visited = True
+            else:
+                lower_bound = current
+                lower_bound_visited = True
+            next_value = (lower_bound + upper_bound) // 2
+            if (
+                (lower_bound_visited and next_value == lower_bound)
+                or (upper_bound_visited and next_value == upper_bound)
+            ):
+                if abs(previous_recall - recall) < abs(current_recall - recall):
+                    final_recall = previous_recall
+                    final_value = previous
+                else:
+                    final_recall = current_recall
+                    final_value = current
+                return final_value, final_recall
+            previous = current
+            current = next_value
+
+    def search(self, args: tuple[list, list[list[int]]]) -> tuple[float, float, float, float, dict | None]:
         log.info(f"{mp.current_process().name:14} start search the entire test_data to get recall and latency")
         with self.db.init():
+            self.db.prepare_filter(self.filters)
             test_data, ground_truth = args
             ideal_dcg = get_ideal_dcg(self.k)
 
             log.debug(f"test dataset size: {len(test_data)}")
-            if ground_truth is not None:
-                log.debug(f"ground truth size: {ground_truth.columns}, shape: {ground_truth.shape}")
+            log.debug(f"ground truth size: {len(ground_truth)}")
+
+            if (
+                ground_truth is not None
+                and self.db_case_config is not None
+                and (calibration_target := self.db_case_config.search_param()["params"]["calibration_target"]) is not None
+            ):
+                calibration_param = self.db_case_config.search_param()["params"]["calibration_param"]
+                calibration_limit = self.db_case_config.search_param()["params"]["calibration_limit"]
+                log.info(f"{mp.current_process().name:14} calibrating {calibration_param=!s} to {calibration_target=} ({calibration_limit=})")
+                value, recall = self._calibrate(test_data, ground_truth, calibration_param, self.k, calibration_target, calibration_limit)
+                log.info(f"{mp.current_process().name:14} calibrated to {recall=!s} at {value}")
+                config_overwrite = {calibration_param: value}
+            else:
+                config_overwrite = None
 
             latencies, recalls, ndcgs = [], [], []
             for idx, emb in enumerate(test_data):
                 s = time.perf_counter()
                 try:
-                    results = self.db.search_embedding(
-                        emb,
-                        self.k,
-                        self.filters,
-                    )
-
+                    results = self._get_db_search_res(emb, config_overwrite=config_overwrite)
                 except Exception as e:
                     log.warning(f"VectorDB search_embedding error: {e}")
-                    traceback.print_exc(chain=True)
                     raise e from None
 
                 latencies.append(time.perf_counter() - s)
 
                 if ground_truth is not None:
-                    gt = ground_truth["neighbors_id"][idx]
+                    gt = ground_truth[idx]
                     recalls.append(calc_recall(self.k, gt[: self.k], results))
                     ndcgs.append(calc_ndcg(gt[: self.k], results, ideal_dcg))
                 else:
@@ -248,27 +335,34 @@ class SerialSearchRunner:
         avg_ndcg = round(np.mean(ndcgs), 4)
         cost = round(np.sum(latencies), 4)
         p99 = round(np.percentile(latencies, 99), 4)
+        p95 = round(np.percentile(latencies, 95), 4)
         log.info(
             f"{mp.current_process().name:14} search entire test_data: "
             f"cost={cost}s, "
             f"queries={len(latencies)}, "
             f"avg_recall={avg_recall}, "
-            f"avg_ndcg={avg_ndcg},"
+            f"avg_ndcg={avg_ndcg}, "
             f"avg_latency={avg_latency}, "
-            f"p99={p99}"
+            f"p99={p99}, "
+            f"p95={p95}"
         )
-        return (avg_recall, avg_ndcg, p99)
+        return (avg_recall, avg_ndcg, p99, p95, config_overwrite)
 
-    def _run_in_subprocess(self) -> tuple[float, float]:
+    def _run_in_subprocess(self) -> tuple[float, float, float, float, dict | None]:
         with concurrent.futures.ProcessPoolExecutor(max_workers=1) as executor:
             future = executor.submit(self.search, (self.test_data, self.ground_truth))
             return future.result()
 
     @utils.time_it
-    def run(self) -> tuple[float, float, float]:
+    def run(self) -> tuple[float, float, float, float, dict | None]:
         """
+        Search all test data in serial.
         Returns:
-            tuple[tuple[float, float, float], float]: (avg_recall, avg_ndcg, p99_latency), cost
-
+            tuple[float, float, float, float, dict | None]: (avg_recall, avg_ndcg, p99_latency, p95_latency, config_overwrite)
         """
+        log.info(f"{mp.current_process().name:14} start serial search")
+        if self.test_data is None:
+            msg = "empty test_data"
+            raise RuntimeError(msg)
+
         return self._run_in_subprocess()

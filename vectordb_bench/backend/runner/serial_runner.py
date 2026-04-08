@@ -46,9 +46,10 @@ class SerialInsertRunner:
             log.info(f"({mp.current_process().name:16}) Start inserting embeddings in batch {config.NUM_PER_BATCH}")
             start = time.perf_counter()
             for data_df in self.dataset:
-                all_metadata = data_df[self.dataset.data.train_id_field].tolist()
+                # Use standard field names (compatible with all datasets)
+                all_metadata = data_df["id"].tolist()
+                emb_np = np.stack(data_df["emb"])
 
-                emb_np = np.stack(data_df[self.dataset.data.train_vector_field])
                 if self.normalize:
                     log.debug("normalize the 100k train data")
                     all_embeddings = (emb_np / np.linalg.norm(emb_np, axis=1)[:, np.newaxis]).tolist()
@@ -59,7 +60,8 @@ class SerialInsertRunner:
 
                 labels_data = None
                 if self.filters.type == FilterOp.StrEqual:
-                    if self.dataset.data.scalar_labels_file_separated:
+                    # Check if dataset has separated scalar labels file
+                    if hasattr(self.dataset.data, 'scalar_labels_file_separated') and self.dataset.data.scalar_labels_file_separated:
                         labels_data = self.dataset.scalar_labels[self.filters.label_field][all_metadata].to_list()
                     else:
                         labels_data = data_df[self.filters.label_field].tolist()
@@ -199,7 +201,7 @@ class SerialSearchRunner:
         self,
         db: api.VectorDB,
         test_data: list[list[float]],
-        ground_truth: list[list[int]],
+        ground_truth: pd.DataFrame | list[list[int]],
         db_case_config: api.DBCaseConfig | None = None,
         k: int = 100,
         filters: Filter = non_filter,
@@ -231,7 +233,7 @@ class SerialSearchRunner:
     def _calibrate(
         self,
         test_data: list,
-        ground_truth: list[list[int]],
+        ground_truth: pd.DataFrame | list[list[int]],
         calibration_param: str,
         min_value: int,
         recall: float,
@@ -256,7 +258,9 @@ class SerialSearchRunner:
             for idx, emb in enumerate(test_data):
                 s = time.perf_counter()
                 results = self._get_db_search_res(emb, config_overwrite=config_overwrite)
-                recalls.append(calc_recall(self.k, ground_truth[idx][: self.k], results))
+                # Handle both DataFrame and list formats for ground truth
+                gt = ground_truth[idx] if not isinstance(ground_truth, pd.DataFrame) else ground_truth.iloc[idx].values
+                recalls.append(calc_recall(self.k, gt[: self.k], results))
             current_recall = np.mean(recalls)
             if np.isclose(current_recall, recall):
                 return current, current_recall
@@ -281,7 +285,7 @@ class SerialSearchRunner:
             previous = current
             current = next_value
 
-    def search(self, args: tuple[list, list[list[int]]]) -> tuple[float, float, float, float, dict | None]:
+    def search(self, args: tuple[list, pd.DataFrame | list[list[int]]]) -> tuple[float, float, float, float, dict | None]:
         log.info(f"{mp.current_process().name:14} start search the entire test_data to get recall and latency")
         with self.db.init():
             self.db.prepare_filter(self.filters)
@@ -317,7 +321,8 @@ class SerialSearchRunner:
                 latencies.append(time.perf_counter() - s)
 
                 if ground_truth is not None:
-                    gt = ground_truth[idx]
+                    # Handle both DataFrame and list formats for ground truth
+                    gt = ground_truth[idx] if not isinstance(ground_truth, pd.DataFrame) else ground_truth.iloc[idx].values
                     recalls.append(calc_recall(self.k, gt[: self.k], results))
                     ndcgs.append(calc_ndcg(gt[: self.k], results, ideal_dcg))
                 else:

@@ -69,15 +69,10 @@ class ReadWriteRunner(MultiProcessingSearchRunner, RatedMultiThreadingInsertRunn
             dataset_iter=iter(dataset),
             normalize=normalize,
         )
-        # Convert ground truth to list format if it's a DataFrame
-        gt_data = dataset.gt_data
-        if gt_data is not None and hasattr(gt_data, 'values'):
-            gt_data = gt_data.values.tolist()
-
         self.serial_search_runner = SerialSearchRunner(
             db=db,
             test_data=test_emb,
-            ground_truth=gt_data,
+            ground_truth=dataset.gt_data,
             db_case_config=None,  # ReadWriteRunner doesn't use calibration
             k=k,
             filters=filters,

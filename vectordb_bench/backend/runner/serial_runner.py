@@ -59,7 +59,7 @@ class SerialInsertRunner:
                 log.debug(f"batch dataset size: {len(all_embeddings)}, {len(all_metadata)}")
 
                 labels_data = None
-                if self.filters.type == FilterOp.StrEqual:
+                if hasattr(self.filters, 'type') and self.filters.type == FilterOp.StrEqual:
                     # Check if dataset has separated scalar labels file
                     if hasattr(self.dataset.data, 'scalar_labels_file_separated') and self.dataset.data.scalar_labels_file_separated:
                         labels_data = self.dataset.scalar_labels[self.filters.label_field][all_metadata].to_list()

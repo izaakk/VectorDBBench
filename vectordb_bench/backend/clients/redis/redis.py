@@ -91,8 +91,13 @@ class Redis(VectorDB):
             index_params = self.case_config.index_param()
             index_type = index_params["index_type"]
 
-            # redis-py is patched to accept "SVS-VAMANA" - pass through original value
-            # Valkey expects the full "SVS-VAMANA" string in FT.CREATE command
+            # Normalize index type for redis-py validation
+            # redis-py only accepts ["FLAT", "HNSW", "SVS"]
+            # Must normalize BEFORE calling VectorField() because validation happens in __init__
+            redis_py_index_type = index_type
+            if index_type == "SVS-VAMANA":
+                log.info(f"Normalizing algorithm for redis-py: '{index_type}' → 'SVS'")
+                redis_py_index_type = "SVS"
 
             vector_field_attrs = {
                 "TYPE": self._redis_type,  # FLOAT16, FLOAT32 or FLOAT64
@@ -101,14 +106,8 @@ class Redis(VectorDB):
                 **index_params["params"],
             }
 
-            # Create VectorField with original index_type for redis-py validation
-            vector_field = VectorField(self._vector_field, index_type, vector_field_attrs)
-
-            # Normalize for Valkey server compatibility
-            # redis-py validates 'SVS-VAMANA' but Valkey expects just 'SVS'
-            if index_type == "SVS-VAMANA":
-                log.info(f"Normalizing algorithm for Valkey: '{index_type}' → 'SVS'")
-                vector_field.args[1] = "SVS"  # args = [VECTOR, algorithm, count, ...]
+            # Create VectorField with normalized index type for redis-py validation
+            vector_field = VectorField(self._vector_field, redis_py_index_type, vector_field_attrs)
 
             schema = [
                 NumericField(self._numeric_field),

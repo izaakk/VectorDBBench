@@ -161,22 +161,20 @@ class CaseRunner(BaseModel):
                     log.info("Data loading skipped")
             if TaskStage.SEARCH_SERIAL in self.config.stages or TaskStage.SEARCH_CONCURRENT in self.config.stages:
                 self._init_search_runner()
-                if TaskStage.SEARCH_CONCURRENT in self.config.stages:
-                    search_results = self._conc_search()
-                    (
-                        m.qps,
-                        m.conc_num_list,
-                        m.conc_qps_list,
-                        m.conc_latency_p99_list,
-                        m.conc_latency_avg_list,
-                    ) = search_results
-                if TaskStage.SEARCH_SERIAL in self.config.stages:
-                    search_results = self._serial_search()
-                    """
-                    m.recall = search_results.recall
-                    m.serial_latencies = search_results.serial_latencies
-                    """
-                    m.recall, m.ndcg, m.serial_latency_p99 = search_results
+                # Execute search stages in the order specified by config.stages
+                for stage in self.config.stages:
+                    if stage == TaskStage.SEARCH_SERIAL:
+                        search_results = self._serial_search()
+                        m.recall, m.ndcg, m.serial_latency_p99 = search_results
+                    elif stage == TaskStage.SEARCH_CONCURRENT:
+                        search_results = self._conc_search()
+                        (
+                            m.qps,
+                            m.conc_num_list,
+                            m.conc_qps_list,
+                            m.conc_latency_p99_list,
+                            m.conc_latency_avg_list,
+                        ) = search_results
 
         except Exception as e:
             log.warning(f"Failed to run performance case, reason = {e}")

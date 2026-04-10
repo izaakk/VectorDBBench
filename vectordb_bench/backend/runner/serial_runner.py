@@ -262,11 +262,19 @@ class SerialSearchRunner:
                 # Handle both DataFrame and list formats for ground truth (pandas or polars)
                 # Use to_numpy() to ensure we get a numpy array, not a DataFrame/Series
                 if isinstance(ground_truth, (pd.DataFrame, pd.Series, pl.DataFrame, pl.Series)):
-                    if isinstance(ground_truth, (pl.DataFrame, pl.Series)):
-                        # Polars DataFrame/Series: row() returns tuple, need to convert to numpy
-                        gt = np.array(ground_truth.row(idx)) if isinstance(ground_truth, pl.DataFrame) else np.array(ground_truth[idx])
+                    if isinstance(ground_truth, pl.DataFrame):
+                        # Polars DataFrame: row() returns tuple, extract first element
+                        # For neighbors.parquet, this is a single column with list values
+                        row_tuple = ground_truth.row(idx)
+                        gt = row_tuple[0] if len(row_tuple) == 1 else np.array(row_tuple)
+                    elif isinstance(ground_truth, pl.Series):
+                        # Polars Series: direct indexing works
+                        gt = ground_truth[idx]
+                    elif isinstance(ground_truth, pd.Series):
+                        # Pandas Series
+                        gt = ground_truth.iloc[idx].to_numpy() if hasattr(ground_truth.iloc[idx], 'to_numpy') else np.array(ground_truth.iloc[idx])
                     else:
-                        # Pandas DataFrame/Series
+                        # Pandas DataFrame
                         gt = ground_truth.iloc[idx].to_numpy() if hasattr(ground_truth.iloc[idx], 'to_numpy') else np.array(ground_truth.iloc[idx])
                 else:
                     gt = ground_truth[idx]
@@ -334,11 +342,19 @@ class SerialSearchRunner:
                     # Handle both DataFrame and list formats for ground truth (pandas or polars)
                     # Use to_numpy() to ensure we get a numpy array, not a DataFrame/Series
                     if isinstance(ground_truth, (pd.DataFrame, pd.Series, pl.DataFrame, pl.Series)):
-                        if isinstance(ground_truth, (pl.DataFrame, pl.Series)):
-                            # Polars DataFrame/Series: row() returns tuple, need to convert to numpy
-                            gt = np.array(ground_truth.row(idx)) if isinstance(ground_truth, pl.DataFrame) else np.array(ground_truth[idx])
+                        if isinstance(ground_truth, pl.DataFrame):
+                            # Polars DataFrame: row() returns tuple, extract first element
+                            # For neighbors.parquet, this is a single column with list values
+                            row_tuple = ground_truth.row(idx)
+                            gt = row_tuple[0] if len(row_tuple) == 1 else np.array(row_tuple)
+                        elif isinstance(ground_truth, pl.Series):
+                            # Polars Series: direct indexing works
+                            gt = ground_truth[idx]
+                        elif isinstance(ground_truth, pd.Series):
+                            # Pandas Series
+                            gt = ground_truth.iloc[idx].to_numpy() if hasattr(ground_truth.iloc[idx], 'to_numpy') else np.array(ground_truth.iloc[idx])
                         else:
-                            # Pandas DataFrame/Series
+                            # Pandas DataFrame
                             gt = ground_truth.iloc[idx].to_numpy() if hasattr(ground_truth.iloc[idx], 'to_numpy') else np.array(ground_truth.iloc[idx])
                     else:
                         gt = ground_truth[idx]

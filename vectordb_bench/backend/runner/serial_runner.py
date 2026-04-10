@@ -259,7 +259,11 @@ class SerialSearchRunner:
                 s = time.perf_counter()
                 results = self._get_db_search_res(emb, config_overwrite=config_overwrite)
                 # Handle both DataFrame and list formats for ground truth
-                gt = ground_truth[idx] if not isinstance(ground_truth, pd.DataFrame) else ground_truth.iloc[idx].values
+                # Use to_numpy() to ensure we get a numpy array, not a pandas Series
+                if isinstance(ground_truth, (pd.DataFrame, pd.Series)):
+                    gt = ground_truth.iloc[idx].to_numpy() if hasattr(ground_truth.iloc[idx], 'to_numpy') else np.array(ground_truth.iloc[idx])
+                else:
+                    gt = ground_truth[idx]
                 recalls.append(calc_recall(self.k, gt[: self.k], results))
             current_recall = np.mean(recalls)
             if np.isclose(current_recall, recall):
@@ -322,7 +326,11 @@ class SerialSearchRunner:
 
                 if ground_truth is not None:
                     # Handle both DataFrame and list formats for ground truth
-                    gt = ground_truth[idx] if not isinstance(ground_truth, pd.DataFrame) else ground_truth.iloc[idx].values
+                    # Use to_numpy() to ensure we get a numpy array, not a pandas Series
+                    if isinstance(ground_truth, (pd.DataFrame, pd.Series)):
+                        gt = ground_truth.iloc[idx].to_numpy() if hasattr(ground_truth.iloc[idx], 'to_numpy') else np.array(ground_truth.iloc[idx])
+                    else:
+                        gt = ground_truth[idx]
                     recalls.append(calc_recall(self.k, gt[: self.k], results))
                     ndcgs.append(calc_ndcg(gt[: self.k], results, ideal_dcg))
                 else:

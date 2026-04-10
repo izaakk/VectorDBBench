@@ -165,7 +165,8 @@ class CaseRunner(BaseModel):
                 for stage in self.config.stages:
                     if stage == TaskStage.SEARCH_SERIAL:
                         search_results = self._serial_search()
-                        m.recall, m.ndcg, m.serial_latency_p99 = search_results
+                        # Serial search returns (recall, ndcg, p99, p95, config_overwrite)
+                        m.recall, m.ndcg, m.serial_latency_p99, serial_p95, serial_config = search_results
                     elif stage == TaskStage.SEARCH_CONCURRENT:
                         search_results = self._conc_search()
                         (

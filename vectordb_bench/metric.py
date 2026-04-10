@@ -58,6 +58,11 @@ def isLowerIsBetterMetric(metric: str) -> bool:
 
 
 def calc_recall(count: int, ground_truth: list[int], got: list[int]) -> float:
+    # Convert ground_truth to list if it's a numpy array or pandas Series
+    # to avoid "truth value of a Series is ambiguous" error with 'in' operator
+    if hasattr(ground_truth, 'tolist'):
+        ground_truth = ground_truth.tolist()
+
     recalls = np.zeros(count)
     for i, result in enumerate(got):
         if result in ground_truth:

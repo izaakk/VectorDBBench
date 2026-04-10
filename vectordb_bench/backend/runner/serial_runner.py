@@ -7,6 +7,7 @@ import traceback
 
 import numpy as np
 import pandas as pd
+import polars as pl
 import psutil
 
 from vectordb_bench.backend.dataset import DatasetManager
@@ -258,10 +259,15 @@ class SerialSearchRunner:
             for idx, emb in enumerate(test_data):
                 s = time.perf_counter()
                 results = self._get_db_search_res(emb, config_overwrite=config_overwrite)
-                # Handle both DataFrame and list formats for ground truth
-                # Use to_numpy() to ensure we get a numpy array, not a pandas Series
-                if isinstance(ground_truth, (pd.DataFrame, pd.Series)):
-                    gt = ground_truth.iloc[idx].to_numpy() if hasattr(ground_truth.iloc[idx], 'to_numpy') else np.array(ground_truth.iloc[idx])
+                # Handle both DataFrame and list formats for ground truth (pandas or polars)
+                # Use to_numpy() to ensure we get a numpy array, not a DataFrame/Series
+                if isinstance(ground_truth, (pd.DataFrame, pd.Series, pl.DataFrame, pl.Series)):
+                    if isinstance(ground_truth, (pl.DataFrame, pl.Series)):
+                        # Polars DataFrame/Series: row() returns tuple, need to convert to numpy
+                        gt = np.array(ground_truth.row(idx)) if isinstance(ground_truth, pl.DataFrame) else np.array(ground_truth[idx])
+                    else:
+                        # Pandas DataFrame/Series
+                        gt = ground_truth.iloc[idx].to_numpy() if hasattr(ground_truth.iloc[idx], 'to_numpy') else np.array(ground_truth.iloc[idx])
                 else:
                     gt = ground_truth[idx]
                 recalls.append(calc_recall(self.k, gt[: self.k], results))
@@ -325,10 +331,15 @@ class SerialSearchRunner:
                 latencies.append(time.perf_counter() - s)
 
                 if ground_truth is not None:
-                    # Handle both DataFrame and list formats for ground truth
-                    # Use to_numpy() to ensure we get a numpy array, not a pandas Series
-                    if isinstance(ground_truth, (pd.DataFrame, pd.Series)):
-                        gt = ground_truth.iloc[idx].to_numpy() if hasattr(ground_truth.iloc[idx], 'to_numpy') else np.array(ground_truth.iloc[idx])
+                    # Handle both DataFrame and list formats for ground truth (pandas or polars)
+                    # Use to_numpy() to ensure we get a numpy array, not a DataFrame/Series
+                    if isinstance(ground_truth, (pd.DataFrame, pd.Series, pl.DataFrame, pl.Series)):
+                        if isinstance(ground_truth, (pl.DataFrame, pl.Series)):
+                            # Polars DataFrame/Series: row() returns tuple, need to convert to numpy
+                            gt = np.array(ground_truth.row(idx)) if isinstance(ground_truth, pl.DataFrame) else np.array(ground_truth[idx])
+                        else:
+                            # Pandas DataFrame/Series
+                            gt = ground_truth.iloc[idx].to_numpy() if hasattr(ground_truth.iloc[idx], 'to_numpy') else np.array(ground_truth.iloc[idx])
                     else:
                         gt = ground_truth[idx]
                     recalls.append(calc_recall(self.k, gt[: self.k], results))

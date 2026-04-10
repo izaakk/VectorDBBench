@@ -273,6 +273,11 @@ class SerialSearchRunner:
                     gt = gt_arr.tolist() if hasattr(gt_arr, 'tolist') else list(gt_arr)
                 else:
                     gt = ground_truth[idx]
+
+                # Debug logging for first query only
+                if idx == 0:
+                    log.info(f"DEBUG calibration query 0: results={results[:5] if results else []}, gt={gt[:5] if gt else []}, results_type={type(results)}, gt_type={type(gt)}")
+
                 recalls.append(calc_recall(self.k, gt[: self.k], results))
             current_recall = np.mean(recalls)
             if np.isclose(current_recall, recall):
@@ -348,6 +353,11 @@ class SerialSearchRunner:
                         gt = gt_arr.tolist() if hasattr(gt_arr, 'tolist') else list(gt_arr)
                     else:
                         gt = ground_truth[idx]
+
+                    # Debug logging for first query only
+                    if idx == 0:
+                        log.info(f"DEBUG search query 0: results={results[:5] if results else []}, gt={gt[:5] if gt else []}, results_type={type(results)}, gt_type={type(gt)}")
+
                     recalls.append(calc_recall(self.k, gt[: self.k], results))
                     ndcgs.append(calc_ndcg(gt[: self.k], results, ideal_dcg))
                 else:

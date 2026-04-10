@@ -260,13 +260,12 @@ class SerialSearchRunner:
                 s = time.perf_counter()
                 results = self._get_db_search_res(emb, config_overwrite=config_overwrite)
                 # Handle both DataFrame and list formats for ground truth (pandas or polars)
-                # For polars DataFrames, access as Series to avoid row() tuple issues
                 if isinstance(ground_truth, pl.DataFrame):
-                    # Polars DataFrame with list column: df[col][idx] returns Python list directly
-                    col_name = ground_truth.columns[0]
-                    gt = ground_truth[col_name][idx]
+                    # Polars DataFrame: get the row using .row() which handles list columns properly
+                    row_data = ground_truth.row(idx, named=False)
+                    gt = row_data[0] if isinstance(row_data, tuple) and len(row_data) > 0 else row_data
                 elif isinstance(ground_truth, pl.Series):
-                    # Polars Series: direct indexing
+                    # Polars Series: direct indexing should work
                     gt = ground_truth[idx]
                 elif isinstance(ground_truth, (pd.DataFrame, pd.Series)):
                     # Pandas: convert to numpy then list
@@ -336,13 +335,12 @@ class SerialSearchRunner:
 
                 if ground_truth is not None:
                     # Handle both DataFrame and list formats for ground truth (pandas or polars)
-                    # For polars DataFrames, access as Series to avoid row() tuple issues
                     if isinstance(ground_truth, pl.DataFrame):
-                        # Polars DataFrame with list column: df[col][idx] returns Python list directly
-                        col_name = ground_truth.columns[0]
-                        gt = ground_truth[col_name][idx]
+                        # Polars DataFrame: get the row using .row() which handles list columns properly
+                        row_data = ground_truth.row(idx, named=False)
+                        gt = row_data[0] if isinstance(row_data, tuple) and len(row_data) > 0 else row_data
                     elif isinstance(ground_truth, pl.Series):
-                        # Polars Series: direct indexing
+                        # Polars Series: direct indexing should work
                         gt = ground_truth[idx]
                     elif isinstance(ground_truth, (pd.DataFrame, pd.Series)):
                         # Pandas: convert to numpy then list

@@ -261,9 +261,14 @@ class SerialSearchRunner:
                 results = self._get_db_search_res(emb, config_overwrite=config_overwrite)
                 # Handle both DataFrame and list formats for ground truth (pandas or polars)
                 if isinstance(ground_truth, pl.DataFrame):
-                    # Polars DataFrame: get the row using .row() which handles list columns properly
+                    # Polars DataFrame: neighbors.parquet has (id, neighbors_list) structure
+                    # Extract just the neighbors list (second element)
                     row_data = ground_truth.row(idx, named=False)
-                    gt = list(row_data) if isinstance(row_data, tuple) else row_data
+                    if isinstance(row_data, tuple) and len(row_data) >= 2:
+                        # Second element is the neighbors list
+                        gt = row_data[1] if isinstance(row_data[1], list) else list(row_data)
+                    else:
+                        gt = list(row_data) if isinstance(row_data, tuple) else row_data
                 elif isinstance(ground_truth, pl.Series):
                     # Polars Series: direct indexing should work
                     gt = ground_truth[idx]
@@ -341,9 +346,14 @@ class SerialSearchRunner:
                 if ground_truth is not None:
                     # Handle both DataFrame and list formats for ground truth (pandas or polars)
                     if isinstance(ground_truth, pl.DataFrame):
-                        # Polars DataFrame: get the row using .row() which handles list columns properly
+                        # Polars DataFrame: neighbors.parquet has (id, neighbors_list) structure
+                        # Extract just the neighbors list (second element)
                         row_data = ground_truth.row(idx, named=False)
-                        gt = list(row_data) if isinstance(row_data, tuple) else row_data
+                        if isinstance(row_data, tuple) and len(row_data) >= 2:
+                            # Second element is the neighbors list
+                            gt = row_data[1] if isinstance(row_data[1], list) else list(row_data)
+                        else:
+                            gt = list(row_data) if isinstance(row_data, tuple) else row_data
                     elif isinstance(ground_truth, pl.Series):
                         # Polars Series: direct indexing should work
                         gt = ground_truth[idx]

@@ -260,25 +260,18 @@ class SerialSearchRunner:
                 s = time.perf_counter()
                 results = self._get_db_search_res(emb, config_overwrite=config_overwrite)
                 # Handle both DataFrame and list formats for ground truth (pandas or polars)
-                # Convert to plain Python list to avoid polars/pandas type issues
-                if isinstance(ground_truth, (pd.DataFrame, pd.Series, pl.DataFrame, pl.Series)):
-                    if isinstance(ground_truth, pl.DataFrame):
-                        # Polars DataFrame: row() returns tuple, extract first element and convert to list
-                        row_tuple = ground_truth.row(idx)
-                        gt_raw = row_tuple[0] if len(row_tuple) == 1 else row_tuple
-                        # Ensure it's a plain Python list, not a polars List object
-                        gt = list(gt_raw) if hasattr(gt_raw, '__iter__') else [gt_raw]
-                    elif isinstance(ground_truth, pl.Series):
-                        # Polars Series: direct indexing, convert to list
-                        gt = list(ground_truth[idx])
-                    elif isinstance(ground_truth, pd.Series):
-                        # Pandas Series: convert to list
-                        gt_arr = ground_truth.iloc[idx].to_numpy() if hasattr(ground_truth.iloc[idx], 'to_numpy') else np.array(ground_truth.iloc[idx])
-                        gt = gt_arr.tolist() if hasattr(gt_arr, 'tolist') else list(gt_arr)
-                    else:
-                        # Pandas DataFrame: convert to list
-                        gt_arr = ground_truth.iloc[idx].to_numpy() if hasattr(ground_truth.iloc[idx], 'to_numpy') else np.array(ground_truth.iloc[idx])
-                        gt = gt_arr.tolist() if hasattr(gt_arr, 'tolist') else list(gt_arr)
+                # For polars DataFrames, access as Series to avoid row() tuple issues
+                if isinstance(ground_truth, pl.DataFrame):
+                    # Polars DataFrame with list column: df[col][idx] returns Python list directly
+                    col_name = ground_truth.columns[0]
+                    gt = ground_truth[col_name][idx]
+                elif isinstance(ground_truth, pl.Series):
+                    # Polars Series: direct indexing
+                    gt = ground_truth[idx]
+                elif isinstance(ground_truth, (pd.DataFrame, pd.Series)):
+                    # Pandas: convert to numpy then list
+                    gt_arr = ground_truth.iloc[idx].to_numpy() if hasattr(ground_truth.iloc[idx], 'to_numpy') else np.array(ground_truth.iloc[idx])
+                    gt = gt_arr.tolist() if hasattr(gt_arr, 'tolist') else list(gt_arr)
                 else:
                     gt = ground_truth[idx]
                 recalls.append(calc_recall(self.k, gt[: self.k], results))
@@ -343,25 +336,18 @@ class SerialSearchRunner:
 
                 if ground_truth is not None:
                     # Handle both DataFrame and list formats for ground truth (pandas or polars)
-                    # Convert to plain Python list to avoid polars/pandas type issues
-                    if isinstance(ground_truth, (pd.DataFrame, pd.Series, pl.DataFrame, pl.Series)):
-                        if isinstance(ground_truth, pl.DataFrame):
-                            # Polars DataFrame: row() returns tuple, extract first element and convert to list
-                            row_tuple = ground_truth.row(idx)
-                            gt_raw = row_tuple[0] if len(row_tuple) == 1 else row_tuple
-                            # Ensure it's a plain Python list, not a polars List object
-                            gt = list(gt_raw) if hasattr(gt_raw, '__iter__') else [gt_raw]
-                        elif isinstance(ground_truth, pl.Series):
-                            # Polars Series: direct indexing, convert to list
-                            gt = list(ground_truth[idx])
-                        elif isinstance(ground_truth, pd.Series):
-                            # Pandas Series: convert to list
-                            gt_arr = ground_truth.iloc[idx].to_numpy() if hasattr(ground_truth.iloc[idx], 'to_numpy') else np.array(ground_truth.iloc[idx])
-                            gt = gt_arr.tolist() if hasattr(gt_arr, 'tolist') else list(gt_arr)
-                        else:
-                            # Pandas DataFrame: convert to list
-                            gt_arr = ground_truth.iloc[idx].to_numpy() if hasattr(ground_truth.iloc[idx], 'to_numpy') else np.array(ground_truth.iloc[idx])
-                            gt = gt_arr.tolist() if hasattr(gt_arr, 'tolist') else list(gt_arr)
+                    # For polars DataFrames, access as Series to avoid row() tuple issues
+                    if isinstance(ground_truth, pl.DataFrame):
+                        # Polars DataFrame with list column: df[col][idx] returns Python list directly
+                        col_name = ground_truth.columns[0]
+                        gt = ground_truth[col_name][idx]
+                    elif isinstance(ground_truth, pl.Series):
+                        # Polars Series: direct indexing
+                        gt = ground_truth[idx]
+                    elif isinstance(ground_truth, (pd.DataFrame, pd.Series)):
+                        # Pandas: convert to numpy then list
+                        gt_arr = ground_truth.iloc[idx].to_numpy() if hasattr(ground_truth.iloc[idx], 'to_numpy') else np.array(ground_truth.iloc[idx])
+                        gt = gt_arr.tolist() if hasattr(gt_arr, 'tolist') else list(gt_arr)
                     else:
                         gt = ground_truth[idx]
                     recalls.append(calc_recall(self.k, gt[: self.k], results))

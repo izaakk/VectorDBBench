@@ -263,7 +263,7 @@ class SerialSearchRunner:
                 if isinstance(ground_truth, pl.DataFrame):
                     # Polars DataFrame: get the row using .row() which handles list columns properly
                     row_data = ground_truth.row(idx, named=False)
-                    gt = row_data[0] if isinstance(row_data, tuple) and len(row_data) > 0 else row_data
+                    gt = list(row_data) if isinstance(row_data, tuple) else row_data
                 elif isinstance(ground_truth, pl.Series):
                     # Polars Series: direct indexing should work
                     gt = ground_truth[idx]
@@ -338,7 +338,7 @@ class SerialSearchRunner:
                     if isinstance(ground_truth, pl.DataFrame):
                         # Polars DataFrame: get the row using .row() which handles list columns properly
                         row_data = ground_truth.row(idx, named=False)
-                        gt = row_data[0] if isinstance(row_data, tuple) and len(row_data) > 0 else row_data
+                        gt = list(row_data) if isinstance(row_data, tuple) else row_data
                     elif isinstance(ground_truth, pl.Series):
                         # Polars Series: direct indexing should work
                         gt = ground_truth[idx]

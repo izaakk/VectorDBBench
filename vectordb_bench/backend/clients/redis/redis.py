@@ -207,6 +207,11 @@ class Redis(VectorDB):
         return result_len, None
 
     def prepare_filter(self, filters: Filter):
+        # Handle None filters (can occur during subprocess serialization)
+        if filters is None:
+            self._filter = "*"
+            return
+
         if filters.type == FilterOp.NonFilter:
             self._filter = "*"
         elif filters.type == FilterOp.NumGE:

@@ -7,7 +7,7 @@ cd "$BASEDIR"
 LOGDIR="/tmp/benchmark_results"
 mkdir -p "$LOGDIR"
 
-SVS_LIB="$BASEDIR/ScalableVectorSearch/bindings/cpp/build"
+SVS_LIB="$BASEDIR/valkey-search-svs/.build-release/_deps/svs-src/lib"
 SERVER="$BASEDIR/valkey/src/valkey-server"
 CLI="$BASEDIR/valkey/src/valkey-cli"
 MODULE="$BASEDIR/valkey-search-svs/.build-release/libsearch.so"

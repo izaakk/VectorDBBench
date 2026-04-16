@@ -77,10 +77,10 @@ def main():
     # Parameter sweep — focused around 95% recall target
     if args.algorithm == "hnsw":
         param_name = "EF_RUNTIME"
-        values = [150, 160, 170, 180, 190, 200, 210, 220]
+        values = [50, 100, 150, 180, 200, 250, 300, 400, 500]
     else:
         param_name = "SEARCH_WINDOW_SIZE"
-        values = [100, 130, 150, 170, 190, 200, 220, 250]
+        values = [50, 100, 150, 200, 250, 300, 400, 500]
 
     log.info(f"\n{'':=<70}")
     log.info(f"{'':>5}{param_name:>20}  {'Recall@100':>12}  {'Avg Latency':>12}  {'P99 Latency':>12}")

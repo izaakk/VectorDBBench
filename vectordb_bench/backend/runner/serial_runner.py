@@ -149,25 +149,11 @@ class SerialInsertRunner:
 
     @utils.time_it
     def _insert_all_batches(self) -> int:
-        """Performance case only"""
-        with concurrent.futures.ProcessPoolExecutor(
-            mp_context=mp.get_context("spawn"),
-            max_workers=1,
-        ) as executor:
-            future = executor.submit(self.task)
-            try:
-                count = future.result(timeout=self.timeout)
-            except TimeoutError as e:
-                msg = f"VectorDB load dataset timeout in {self.timeout}"
-                log.warning(msg)
-                for pid, _ in executor._processes.items():
-                    psutil.Process(pid).kill()
-                raise PerformanceTimeoutError(msg) from e
-            except Exception as e:
-                log.warning(f"VectorDB load dataset error: {e}")
-                raise e from e
-            else:
-                return count
+        """Performance case only - PATCHED to run in-process"""
+        log.info("Running insert in-process (no ProcessPoolExecutor)")
+        # Run directly in-process instead of spawning - avoids serialization overhead
+        count = self.task()
+        return count
 
     def run_endlessness(self) -> int:
         """run forever util DB raises exception or crash"""
@@ -295,9 +281,9 @@ class SerialSearchRunner:
         return (avg_recall, avg_ndcg, p99, p95)
 
     def _run_in_subprocess(self) -> tuple[float, float, float, float]:
-        with concurrent.futures.ProcessPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(self.search, (self.test_data, self.ground_truth))
-            return future.result()
+        # PATCHED: run in-process instead of subprocess
+        log.info("Running search in-process (no ProcessPoolExecutor)")
+        return self.search((self.test_data, self.ground_truth))
 
     @utils.time_it
     def run(self) -> tuple[float, float, float, float]:

@@ -29,6 +29,7 @@ from ..backend.clients.qdrant_cloud.cli import QdrantCloud
 from ..backend.clients.qdrant_local.cli import QdrantLocal
 from ..backend.clients.redis.cli import Redis
 from ..backend.clients.s3_vectors.cli import S3Vectors
+from ..backend.clients.valkey_search.cli import ValkeySearchHNSW, ValkeySearchSVS
 from ..backend.clients.tencent_elasticsearch.cli import TencentElasticsearch
 from ..backend.clients.test.cli import Test
 from ..backend.clients.tidb.cli import TiDB
@@ -82,6 +83,8 @@ cli.add_command(LindormIVFPQ)
 cli.add_command(LindormHNSW)
 cli.add_command(LindormIVFBQ)
 cli.add_command(Pinecone)
+cli.add_command(ValkeySearchHNSW)
+cli.add_command(ValkeySearchSVS)
 
 
 if __name__ == "__main__":

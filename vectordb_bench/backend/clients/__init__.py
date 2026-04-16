@@ -59,6 +59,8 @@ class DB(Enum):
     Zvec = "Zvec"
     Endee = "Endee"
     Lindorm = "Lindorm"
+    ValkeySearchHNSW = "ValkeySearch_HNSW"
+    ValkeySearchSVS = "ValkeySearch_SVS"
 
     @property
     def init_cls(self) -> type[VectorDB]:  # noqa: PLR0911, PLR0912, C901, PLR0915
@@ -245,6 +247,11 @@ class DB(Enum):
             from .lindorm.lindorm_search import LindormVector
 
             return LindormVector
+
+        if self in (DB.ValkeySearchHNSW, DB.ValkeySearchSVS):
+            from .valkey_search.valkey_search import ValkeySearch
+
+            return ValkeySearch
 
         msg = f"Unknown DB: {self.name}"
         raise ValueError(msg)
@@ -435,6 +442,11 @@ class DB(Enum):
 
             return LindormConfig
 
+        if self in (DB.ValkeySearchHNSW, DB.ValkeySearchSVS):
+            from .valkey_search.config import ValkeySearchConfig
+
+            return ValkeySearchConfig
+
         msg = f"Unknown DB: {self.name}"
         raise ValueError(msg)
 
@@ -600,6 +612,16 @@ class DB(Enum):
             from .lindorm.config import _lindorm_vector_case_config
 
             return _lindorm_vector_case_config.get(index_type)
+
+        if self == DB.ValkeySearchHNSW:
+            from .valkey_search.config import ValkeySearchHNSWConfig
+
+            return ValkeySearchHNSWConfig
+
+        if self == DB.ValkeySearchSVS:
+            from .valkey_search.config import ValkeySearchSVSConfig
+
+            return ValkeySearchSVSConfig
 
         # DB.Pinecone, DB.Redis
         return EmptyDBCaseConfig

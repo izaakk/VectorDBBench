@@ -5,11 +5,6 @@ from typing import Any
 
 import numpy as np
 import redis
-from redis.commands.search.field import NumericField, TagField, VectorField
-try:
-    from redis.commands.search.indexDefinition import IndexDefinition, IndexType
-except ImportError:
-    from redis.commands.search.index_definition import IndexDefinition, IndexType
 from redis.commands.search.query import Query
 
 from vectordb_bench.backend.filter import Filter, FilterOp
@@ -83,52 +78,77 @@ class Redis(VectorDB):
         conn = None
 
     def make_index(self, vector_dimensions: int, conn: redis.Redis):
+        """Create index using raw execute_command for full parameter control.
+
+        This bypasses redis-py's VectorField abstraction to ensure ALL parameters
+        (including COMPRESSION) are passed correctly to the FT.CREATE command.
+        """
         try:
-            # check to see if index exists
+            # Check to see if index exists
             conn.ft(INDEX_NAME).info()
             log.info(f"Index {INDEX_NAME} already exists, skipping creation")
+            return
         except Exception:
-            index_params = self.case_config.index_param()
-            index_type = index_params["index_type"]
+            pass
 
-            # Normalize index type for redis-py validation
-            # redis-py only accepts ["FLAT", "HNSW", "SVS"]
-            # Must normalize BEFORE calling VectorField() because validation happens in __init__
-            redis_py_index_type = index_type
-            if index_type == "SVS-VAMANA":
-                log.info(f"Normalizing algorithm for redis-py: '{index_type}' → 'SVS'")
-                redis_py_index_type = "SVS"
+        index_params = self.case_config.index_param()
+        index_type = index_params["index_type"]
+        params = index_params["params"]
+        metric_type = index_params.get("metric_type", "COSINE")
 
-            vector_field_attrs = {
-                "TYPE": self._redis_type,  # FLOAT16, FLOAT32 or FLOAT64
-                "DIM": vector_dimensions,  # Number of Vector Dimensions
-                "DISTANCE_METRIC": "COSINE",  # Vector Search Distance Metric
-                **index_params["params"],
-            }
+        # Normalize index type: "SVS-VAMANA" → "SVS"
+        if index_type == "SVS-VAMANA":
+            log.info(f"Normalizing algorithm: '{index_type}' → 'SVS'")
+            algorithm = "SVS"
+        elif index_type in ["HNSW", "FLAT", "SVS"]:
+            algorithm = index_type
+        else:
+            log.warning(f"Unknown index type '{index_type}', defaulting to 'FLAT'")
+            algorithm = "FLAT"
 
-            # Create VectorField with normalized index type for redis-py validation
-            vector_field = VectorField(self._vector_field, redis_py_index_type, vector_field_attrs)
+        # Build vector parameters as flat key-value list
+        vector_params = [
+            "TYPE", self._redis_type,
+            "DIM", str(vector_dimensions),
+            "DISTANCE_METRIC", metric_type,
+        ]
 
-            schema = [
-                NumericField(self._numeric_field),
-                vector_field,
-            ]
-            if self.with_scalar_labels:
-                schema.append(TagField(self._label_field))
+        # Add algorithm-specific parameters from config
+        for key, value in params.items():
+            # Skip hybrid_policy and filtering_batch_size (runtime params, not index params)
+            if key in ["hybrid_policy", "filtering_batch_size"]:
+                continue
+            vector_params.extend([str(key), str(value)])
 
-            definition = IndexDefinition(index_type=IndexType.HASH)
+        log.info(f"Creating index '{INDEX_NAME}' with algorithm: {algorithm}")
+        log.info(f"Vector parameters: {vector_params}")
 
-            rs = conn.ft(INDEX_NAME)
+        # Build FT.CREATE command
+        cmd = [
+            "FT.CREATE", INDEX_NAME,
+            "ON", "HASH",
+            "PREFIX", "1", f"{INDEX_NAME}:",
+            "SCHEMA",
+        ]
 
-            # Fix 5: Native command logging for debugging and verification
-            log.info(f"Creating index '{INDEX_NAME}' with type: {index_type}")
-            log.info(f"Index params from config: {index_params}")
-            log.info(f"Vector field attributes: {vector_field_attrs}")
-            log.info(f"Schema: {schema}")
-            log.info(f"Definition: {definition}")
+        # Add numeric field for metadata filtering
+        cmd.extend([self._numeric_field, "NUMERIC"])
 
-            rs.create_index(schema, definition=definition)
-            log.info(f"Index '{INDEX_NAME}' created successfully")
+        # Add label field if enabled
+        if self.with_scalar_labels:
+            cmd.extend([self._label_field, "TAG"])
+
+        # Add vector field with all parameters
+        cmd.extend([
+            self._vector_field, "VECTOR", algorithm, str(len(vector_params))
+        ])
+        cmd.extend(vector_params)
+
+        log.info(f"FT.CREATE command: {' '.join(cmd)}")
+
+        # Execute raw command
+        conn.execute_command(*cmd)
+        log.info(f"Index '{INDEX_NAME}' created successfully with {algorithm} algorithm")
 
     @contextmanager
     def init(self) -> None:

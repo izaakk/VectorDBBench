@@ -124,10 +124,10 @@ class Redis(VectorDB):
         log.info(f"Vector parameters: {vector_params}")
 
         # Build FT.CREATE command
+        # Note: No PREFIX specified - matches original behavior where keys are numeric IDs
         cmd = [
             "FT.CREATE", INDEX_NAME,
             "ON", "HASH",
-            "PREFIX", "1", f"{INDEX_NAME}:",
             "SCHEMA",
         ]
 

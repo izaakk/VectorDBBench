@@ -276,4 +276,10 @@ class Redis(VectorDB):
         )
         query_params = {"vec": query_vector}
         res = self.conn.ft(INDEX_NAME).search(query_obj, query_params)
-        return [int(doc["id"]) for doc in res.docs]
+        results = []
+        for doc in res.docs:
+            try:
+                results.append(int(doc["id"]))
+            except (KeyError, ValueError):
+                results.append(int(doc.id.split(":")[-1]))
+        return results

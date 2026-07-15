@@ -280,6 +280,6 @@ class Redis(VectorDB):
         for doc in res.docs:
             try:
                 results.append(int(doc["id"]))
-            except (KeyError, ValueError):
+            except (KeyError, ValueError, TypeError):
                 results.append(int(doc.id.split(":")[-1]))
         return results

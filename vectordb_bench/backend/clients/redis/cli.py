@@ -113,7 +113,7 @@ class RedisSVSVAMANATypedDict(CommonTypedDict, RedisTypedDict):
             "--compression",
             type=click.Choice(SVS_VAMANA_COMPRESSION_OPTIONS, case_sensitive=True),
             default=None,
-            help="SVS-VAMANA compression type (official SVS types: NONE, FP16, LVQ4, LVQ8, LVQ4X4, LVQ4X8)",
+            help="SVS-VAMANA compression type (official SVS types: NONE, FP16, SQ8, LVQ4, LVQ8, LVQ4X4, LVQ4X8)",
         ),
     ]
 
@@ -158,6 +158,7 @@ def RedisSVSVAMANA(**parameters: Unpack[RedisSVSVAMANATypedDict]):
     Supports official SVS compression types from protobuf schema:
     - NONE: No compression
     - FP16: 16-bit floating point
+    - SQ8: Scalar 8-bit quantization
     - LVQ4: 4-bit learned vector quantization
     - LVQ8: 8-bit learned vector quantization
     - LVQ4X4: 4-bit + 4-bit LVQ

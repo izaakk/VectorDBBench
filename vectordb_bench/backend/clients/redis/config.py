@@ -6,7 +6,7 @@ from ..api import DBCaseConfig, DBConfig, IndexType, MetricType
 
 # Official SVS compression types from protobuf schema (SVSCompressionType enum)
 # See: https://github.com/izaakk/valkey-search/blob/svs-iteration-0/SVS_ITERATION_0_TUTORIAL.md#11-protobuf-schema
-SVS_VAMANA_COMPRESSION_OPTIONS = ["NONE", "FP16", "LVQ4", "LVQ8", "LVQ4X4", "LVQ4X8"]
+SVS_VAMANA_COMPRESSION_OPTIONS = ["NONE", "FP16", "SQ8", "LVQ4", "LVQ8", "LVQ4X4", "LVQ4X8"]
 
 
 class RedisConfig(DBConfig):
@@ -86,8 +86,8 @@ class RedisSVSVAMANAConfig(RedisIndexConfig, DBCaseConfig):
     graph_max_degree: int
     construction_window_size: int
     search_window_size: int | None = None
-    # Official SVS compression types: NONE, FP16, LVQ4, LVQ8, LVQ4X4, LVQ4X8
-    compression: Literal["NONE", "FP16", "LVQ4", "LVQ8", "LVQ4X4", "LVQ4X8"] | None = None
+    # Official SVS compression types: NONE, FP16, SQ8, LVQ4, LVQ8, LVQ4X4, LVQ4X8
+    compression: Literal["NONE", "FP16", "SQ8", "LVQ4", "LVQ8", "LVQ4X4", "LVQ4X8"] | None = None
     index: IndexType = IndexType.SVS_VAMANA
     calibration_param: Literal["search_window_size", "filtering_batch_size"] = "search_window_size"
 
@@ -109,7 +109,7 @@ class RedisSVSVAMANAConfig(RedisIndexConfig, DBCaseConfig):
             compression_upper = self.compression.upper()
 
             # Validate against official SVS types
-            valid_svs_compression = ["NONE", "FP16", "LVQ4", "LVQ8", "LVQ4X4", "LVQ4X8"]
+            valid_svs_compression = ["NONE", "FP16", "SQ8", "LVQ4", "LVQ8", "LVQ4X4", "LVQ4X8"]
             if compression_upper not in valid_svs_compression:
                 raise ValueError(
                     f"Invalid SVS compression type: {self.compression}. "

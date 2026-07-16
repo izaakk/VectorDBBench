@@ -11,7 +11,7 @@ from vectordb_bench.backend.filter import Filter, FilterOp
 from ..api import DBCaseConfig, VectorDB
 
 log = logging.getLogger(__name__)
-INDEX_NAME = "index"  # Vector Index Name
+INDEX_NAME = "vdbbench"  # Vector Index Name — matches load_vectors_simple.py
 
 
 class Redis(VectorDB):

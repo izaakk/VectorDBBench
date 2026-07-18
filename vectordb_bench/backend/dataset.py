@@ -192,7 +192,7 @@ class DatasetManager(BaseModel):
 
     data: BaseDataset
     test_data: pd.DataFrame | None = None
-    gt_data: pd.DataFrame | None = None
+    gt_data: list[list[int]] | None = None
     train_files: list[str] = []
     reader: DatasetReader | None = None
 
@@ -263,7 +263,13 @@ class DatasetManager(BaseModel):
             self.test_data = self._read_file(test_file)
 
         if gt_file is not None:
-            self.gt_data = self._read_file(gt_file)
+            gt_df = self._read_file(gt_file)
+            neighbors_col = next(
+                (col for col, dtype in zip(gt_df.columns, gt_df.dtypes)
+                 if dtype == pl.List(pl.Int64) or str(dtype).startswith("list")),
+                gt_df.columns[-1],
+            )
+            self.gt_data = gt_df[neighbors_col].to_list()
 
         prefix = "shuffle_train" if use_shuffled else "train"
         self.train_files = sorted([f.name for f in self.data_dir.glob(f"{prefix}*.parquet")])

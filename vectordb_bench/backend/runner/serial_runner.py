@@ -6,8 +6,6 @@ import time
 import traceback
 
 import numpy as np
-import pandas as pd
-import polars as pl
 import psutil
 
 from vectordb_bench.backend.dataset import DatasetManager
@@ -202,7 +200,7 @@ class SerialSearchRunner:
         self,
         db: api.VectorDB,
         test_data: list[list[float]],
-        ground_truth: pd.DataFrame | list[list[int]],
+        ground_truth: list[list[int]],
         db_case_config: api.DBCaseConfig | None = None,
         k: int = 100,
         filters: Filter = non_filter,
@@ -234,7 +232,7 @@ class SerialSearchRunner:
     def _calibrate(
         self,
         test_data: list,
-        ground_truth: pd.DataFrame | list[list[int]],
+        ground_truth: list[list[int]],
         calibration_param: str,
         min_value: int,
         recall: float,
@@ -259,29 +257,10 @@ class SerialSearchRunner:
             for idx, emb in enumerate(test_data):
                 s = time.perf_counter()
                 results = self._get_db_search_res(emb, config_overwrite=config_overwrite)
-                # Handle both DataFrame and list formats for ground truth (pandas or polars)
-                if isinstance(ground_truth, pl.DataFrame):
-                    # Polars DataFrame: neighbors.parquet has (id, neighbors_list) structure
-                    # Extract just the neighbors list (second element)
-                    row_data = ground_truth.row(idx, named=False)
-                    if isinstance(row_data, tuple) and len(row_data) >= 2:
-                        # Second element is the neighbors list
-                        gt = row_data[1] if isinstance(row_data[1], list) else list(row_data)
-                    else:
-                        gt = list(row_data) if isinstance(row_data, tuple) else row_data
-                elif isinstance(ground_truth, pl.Series):
-                    # Polars Series: direct indexing should work
-                    gt = ground_truth[idx]
-                elif isinstance(ground_truth, (pd.DataFrame, pd.Series)):
-                    # Pandas: convert to numpy then list
-                    gt_arr = ground_truth.iloc[idx].to_numpy() if hasattr(ground_truth.iloc[idx], 'to_numpy') else np.array(ground_truth.iloc[idx])
-                    gt = gt_arr.tolist() if hasattr(gt_arr, 'tolist') else list(gt_arr)
-                else:
-                    gt = ground_truth[idx]
+                gt = ground_truth[idx]
 
-                # Debug logging for first query only
                 if idx == 0:
-                    log.info(f"DEBUG calibration query 0: results={results[:5] if results else []}, gt={gt[:5] if gt else []}, results_type={type(results)}, gt_type={type(gt)}")
+                    log.info(f"DEBUG calibration query 0: results={results[:5] if results else []}, gt={gt[:5] if gt else []}")
 
                 recalls.append(calc_recall(self.k, gt[: self.k], results))
             current_recall = np.mean(recalls)
@@ -308,7 +287,7 @@ class SerialSearchRunner:
             previous = current
             current = next_value
 
-    def search(self, args: tuple[list, pd.DataFrame | list[list[int]]]) -> tuple[float, float, float, float, dict | None]:
+    def search(self, args: tuple[list, list[list[int]]]) -> tuple[float, float, float, float, dict | None]:
         log.info(f"{mp.current_process().name:14} start search the entire test_data to get recall and latency")
         with self.db.init():
             self.db.prepare_filter(self.filters)
@@ -344,29 +323,10 @@ class SerialSearchRunner:
                 latencies.append(time.perf_counter() - s)
 
                 if ground_truth is not None:
-                    # Handle both DataFrame and list formats for ground truth (pandas or polars)
-                    if isinstance(ground_truth, pl.DataFrame):
-                        # Polars DataFrame: neighbors.parquet has (id, neighbors_list) structure
-                        # Extract just the neighbors list (second element)
-                        row_data = ground_truth.row(idx, named=False)
-                        if isinstance(row_data, tuple) and len(row_data) >= 2:
-                            # Second element is the neighbors list
-                            gt = row_data[1] if isinstance(row_data[1], list) else list(row_data)
-                        else:
-                            gt = list(row_data) if isinstance(row_data, tuple) else row_data
-                    elif isinstance(ground_truth, pl.Series):
-                        # Polars Series: direct indexing should work
-                        gt = ground_truth[idx]
-                    elif isinstance(ground_truth, (pd.DataFrame, pd.Series)):
-                        # Pandas: convert to numpy then list
-                        gt_arr = ground_truth.iloc[idx].to_numpy() if hasattr(ground_truth.iloc[idx], 'to_numpy') else np.array(ground_truth.iloc[idx])
-                        gt = gt_arr.tolist() if hasattr(gt_arr, 'tolist') else list(gt_arr)
-                    else:
-                        gt = ground_truth[idx]
+                    gt = ground_truth[idx]
 
-                    # Debug logging for first query only
                     if idx == 0:
-                        log.info(f"DEBUG search query 0: results={results[:5] if results else []}, gt={gt[:5] if gt else []}, results_type={type(results)}, gt_type={type(gt)}")
+                        log.info(f"DEBUG search query 0: results={results[:5] if results else []}, gt={gt[:5] if gt else []}")
 
                     recalls.append(calc_recall(self.k, gt[: self.k], results))
                     ndcgs.append(calc_ndcg(gt[: self.k], results, ideal_dcg))
